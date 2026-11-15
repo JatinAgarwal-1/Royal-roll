@@ -65,11 +65,22 @@ function saveLocal(){localStorage.setItem('rr-last-room',room.code)}
 function setViews(inGame){$('lobby').classList.toggle('hidden',inGame);$('game').classList.toggle('hidden',!inGame)}
 
 async function createRoom(){
-  setError(''); if(!supabase){setError('Add your Supabase URL and anon key in app.js, then run the SQL setup.');return}
-  const name=$('player-name').value.trim()||'Player 1'; const code=randomCode(); const host=newPlayer(name,'red',localPlayerId); room=initialState(code,host,$('team-mode').checked); if(room.teamMode)assignDefaultTeams(); isHost=true;
-  const {error}=await supabase.from('ludo_rooms').insert({room_code:code,state:room});
-  if(error){room=null;setError('Could not create room: '+error.message);return}
-  await enterGame();
+  const button=$('create-room');setError('');
+  if(!supabase){setError('Online setup is unavailable: Supabase did not initialize. Refresh and try again.');return}
+  if(button.disabled)return;
+  button.disabled=true;button.textContent='Creating room…';
+  try{
+    const name=$('player-name').value.trim()||'Player 1';let created=false,lastError=null;
+    for(let attempt=0;attempt<3&&!created;attempt++){
+      const code=randomCode(),host=newPlayer(name,'red',localPlayerId),nextRoom=initialState(code,host,$('team-mode').checked);
+      if(nextRoom.teamMode){const pairs={red:'A',yellow:'A',green:'B',blue:'B'};nextRoom.players.forEach(p=>p.team=pairs[p.color]);}
+      const {error}=await supabase.from('ludo_rooms').insert({room_code:code,state:nextRoom});
+      if(!error){room=nextRoom;isHost=true;created=true;}else{lastError=error;if(error.code!=='23505')break;}
+    }
+    if(!created){room=null;setError('Room creation failed: '+(lastError?.message||lastError?.details||'No response from database.')+' Check Supabase table and RLS policies.');return;}
+    await enterGame();
+  }catch(err){room=null;setError('Could not create room: '+(err?.message||String(err))+' Please refresh and try again.');console.error('Roll Royale createRoom error:',err);}
+  finally{button.disabled=false;button.innerHTML='<span>＋</span> Create a private room <span class="btn-arrow">↗</span>';}
 }
 async function joinRoom(){
   setError(''); if(!supabase){setError('Add your Supabase URL and anon key in app.js, then run the SQL setup.');return}
