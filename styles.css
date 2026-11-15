@@ -25,3 +25,10 @@
 .token.movable{animation:tokenAppear .22s ease-out,pulse 1s .22s infinite}
 @keyframes diceBounce{0%{transform:translateY(0) rotate(0)}25%{transform:translateY(-9px) rotate(-10deg)}50%{transform:translateY(2px) rotate(8deg)}75%{transform:translateY(-4px) rotate(-5deg)}100%{transform:translateY(0) rotate(0)}}
 @keyframes tokenAppear{0%{opacity:.35;scale:.55}70%{opacity:1;scale:1.12}100%{scale:1}}
+
+.token-moved{animation:tokenTravel .42s cubic-bezier(.2,.8,.25,1)}
+.token-release{animation:tokenRelease .38s ease-out}
+.token-safe{animation:tokenSafe .62s ease-out}
+@keyframes tokenTravel{0%{opacity:.4;scale:.65;filter:brightness(1.5)}65%{opacity:1;scale:1.22;filter:brightness(1.25)}100%{scale:1;filter:none}}
+@keyframes tokenRelease{0%{scale:.25;opacity:.2;box-shadow:0 0 0 0 rgba(255,255,255,.7)}70%{scale:1.25;opacity:1;box-shadow:0 0 0 9px rgba(255,255,255,.18)}100%{scale:1;box-shadow:0 2px 5px rgba(0,0,0,.3)}}
+@keyframes tokenSafe{0%{scale:1}35%{scale:1.35;box-shadow:0 0 0 10px rgba(255,211,105,.4),0 0 24px rgba(255,211,105,.9)}100%{scale:1;box-shadow:0 2px 5px rgba(0,0,0,.3)}}
