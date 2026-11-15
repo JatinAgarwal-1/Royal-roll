@@ -42,12 +42,12 @@ function showToast(msg){const el=$('toast');el.textContent=msg;el.classList.add(
 function playSound(type){if(!soundEnabled)return;try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;audioContext=audioContext||new Ctx();if(audioContext.state==='suspended')audioContext.resume();const now=audioContext.currentTime;const patterns={roll:[[220,.07],[330,.07],[440,.12]],move:[[520,.08],[660,.1]],release:[[392,.09],[587,.14]],safe:[[660,.1],[880,.16]],capture:[[260,.12],[180,.18]]};(patterns[type]||patterns.move).forEach(([freq,d],i)=>{const o=audioContext.createOscillator(),g=audioContext.createGain();o.type=type==='roll'?'triangle':'sine';o.frequency.setValueAtTime(freq,now+i*.09);g.gain.setValueAtTime(.0001,now+i*.09);g.gain.exponentialRampToValueAtTime(.12,now+i*.09+.015);g.gain.exponentialRampToValueAtTime(.0001,now+i*.09+d);o.connect(g);g.connect(audioContext.destination);o.start(now+i*.09);o.stop(now+i*.09+d+.02);});}catch(e){}}
 function toggleSound(){soundEnabled=!soundEnabled;$('sound-toggle').textContent=soundEnabled?'Sound: On':'Sound: Off';if(soundEnabled)playSound('safe')}
 function canStartGame(){return !!room&&(room.teamMode?room.players.length===4:room.players.length>=2)}
-async function startGame(){if(!isRoomHost()||!room||room.status!=='waiting'||!canStartGame())return;room.status='playing';room.turn=0;room.dice=null;room.message='The game has started. Good luck!';await publish();render()}
+async function startGame(){if(!room||!isRoomHost()||room.status!=='waiting'||!canStartGame())return;room.status='playing';room.turn=0;room.dice=null;room.message=`${getMe()?.name||'Host'} started the game. Good luck!`;await publish();render()}
 function setError(msg){$('lobby-error').textContent=msg||''}
 function setConnection(online){$('connection-label').textContent=online?'Live multiplayer':'Offline demo';$('connection-label').previousElementSibling.classList.toggle('live',online)}
 function randomCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<6;i++)s+=chars[Math.floor(Math.random()*chars.length)];return s}
 function getMe(){return room?.players.find(p=>p.id===localPlayerId)}
-function isRoomHost(){return !!room&&(room.hostId?room.hostId===localPlayerId:isHost)}
+function isRoomHost(){return !!room&&(room.hostId?room.hostId===localPlayerId:(room.players?.[0]?.id===localPlayerId||isHost))}
 function currentPlayer(){return room?.players[room.turn]}
 function saveLocal(){localStorage.setItem('rr-last-room',room.code)}
 function setViews(inGame){$('lobby').classList.toggle('hidden',inGame);$('game').classList.toggle('hidden',!inGame)}
