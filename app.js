@@ -18,7 +18,7 @@ let room = null, channel = null, localPlayerId = localStorage.getItem('rr-player
 localStorage.setItem('rr-player-id',localPlayerId);
 let isHost = false, busy = false, toastTimer, audioContext = null, soundEnabled = true;
 
-function initialState(code, host, teamMode=true) { return {code, status:'waiting', teamMode, shuffleTeamsOnFull:false, players:[host], turn:0, dice:null, lastRoll:null, message:'Waiting for players to join.', winner:null, updatedAt:Date.now(), revision:0}; }
+function initialState(code, host, teamMode=true) { return {code, hostId:host.id, status:'waiting', teamMode, shuffleTeamsOnFull:false, players:[host], turn:0, dice:null, lastRoll:null, message:'Waiting for players to join.', winner:null, updatedAt:Date.now(), revision:0}; }
 function newPlayer(name,color,id=crypto.randomUUID(),team=null) { return {id,name,color,team,tokens:[-1,-1,-1,-1],connected:true}; }
 function teamName(team){return team==='A'?'Team Sun':'Team Moon'}
 function shuffleTeamsLocal(){
@@ -42,11 +42,12 @@ function showToast(msg){const el=$('toast');el.textContent=msg;el.classList.add(
 function playSound(type){if(!soundEnabled)return;try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;audioContext=audioContext||new Ctx();if(audioContext.state==='suspended')audioContext.resume();const now=audioContext.currentTime;const patterns={roll:[[220,.07],[330,.07],[440,.12]],move:[[520,.08],[660,.1]],release:[[392,.09],[587,.14]],safe:[[660,.1],[880,.16]],capture:[[260,.12],[180,.18]]};(patterns[type]||patterns.move).forEach(([freq,d],i)=>{const o=audioContext.createOscillator(),g=audioContext.createGain();o.type=type==='roll'?'triangle':'sine';o.frequency.setValueAtTime(freq,now+i*.09);g.gain.setValueAtTime(.0001,now+i*.09);g.gain.exponentialRampToValueAtTime(.12,now+i*.09+.015);g.gain.exponentialRampToValueAtTime(.0001,now+i*.09+d);o.connect(g);g.connect(audioContext.destination);o.start(now+i*.09);o.stop(now+i*.09+d+.02);});}catch(e){}}
 function toggleSound(){soundEnabled=!soundEnabled;$('sound-toggle').textContent=soundEnabled?'Sound: On':'Sound: Off';if(soundEnabled)playSound('safe')}
 function canStartGame(){return !!room&&(room.teamMode?room.players.length===4:room.players.length>=2)}
-async function startGame(){if(!isHost||!room||room.status!=='waiting'||!canStartGame())return;room.status='playing';room.turn=0;room.dice=null;room.message='The game has started. Good luck!';await publish();render()}
+async function startGame(){if(!isRoomHost()||!room||room.status!=='waiting'||!canStartGame())return;room.status='playing';room.turn=0;room.dice=null;room.message='The game has started. Good luck!';await publish();render()}
 function setError(msg){$('lobby-error').textContent=msg||''}
 function setConnection(online){$('connection-label').textContent=online?'Live multiplayer':'Offline demo';$('connection-label').previousElementSibling.classList.toggle('live',online)}
 function randomCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<6;i++)s+=chars[Math.floor(Math.random()*chars.length)];return s}
 function getMe(){return room?.players.find(p=>p.id===localPlayerId)}
+function isRoomHost(){return !!room&&(room.hostId?room.hostId===localPlayerId:isHost)}
 function currentPlayer(){return room?.players[room.turn]}
 function saveLocal(){localStorage.setItem('rr-last-room',room.code)}
 function setViews(inGame){$('lobby').classList.toggle('hidden',inGame);$('game').classList.toggle('hidden',!inGame)}
@@ -63,7 +64,7 @@ async function joinRoom(){
   const code=$('room-code-input').value.trim().toUpperCase(); if(code.length!==6){setError('Enter the 6-character room code.');return}
   const {data,error}=await supabase.from('ludo_rooms').select('state').eq('room_code',code).maybeSingle();
   if(error||!data){setError('Room not found. Check the code and try again.');return}
-  room=data.state; if(room.status==='finished'){setError('This game has already finished. Create a new room.');return}
+  room=data.state; isHost=room.hostId?room.hostId===localPlayerId:isHost; if(room.status==='finished'){setError('This game has already finished. Create a new room.');return}
   if(room.players.some(p=>p.id===localPlayerId)){isHost=false;await enterGame();return}
   if(room.players.length>=4){setError('This room is full (4 players).');return}
   const seats=room.teamMode?COLORS:['red','yellow','green','blue']; const color=seats[room.players.length]; room.players.push(newPlayer($('player-name').value.trim()||`Player ${room.players.length+1}`,color,localPlayerId));
@@ -79,10 +80,10 @@ async function joinRoom(){
 }
 async function enterGame(){saveLocal();setViews(true);render();setConnection(true);
   if(channel)await supabase.removeChannel(channel);
-  channel=supabase.channel(`ludo-${room.code}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'ludo_rooms',filter:`room_code=eq.${room.code}`},payload=>{if(payload.new?.state){const incoming=payload.new.state;if((incoming.revision||0)>=(room.revision||0)){room=incoming;render()}}}).subscribe(status=>{if(status==='SUBSCRIBED')setConnection(true);if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')setConnection(false)});
+  channel=supabase.channel(`ludo-${room.code}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'ludo_rooms',filter:`room_code=eq.${room.code}`},payload=>{if(payload.new?.state){const incoming=payload.new.state;if((incoming.revision||0)>=(room.revision||0)){room=incoming;isHost=room.hostId?room.hostId===localPlayerId:isHost;render()}}}).subscribe(status=>{if(status==='SUBSCRIBED')setConnection(true);if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')setConnection(false)});
   await refreshRoom();
 }
-async function refreshRoom(){if(!supabase||!room)return;const {data}=await supabase.from('ludo_rooms').select('state').eq('room_code',room.code).maybeSingle();if(data?.state&&(data.state.revision||0)>=(room.revision||0)){room=data.state;render()}}
+async function refreshRoom(){if(!supabase||!room)return;const {data}=await supabase.from('ludo_rooms').select('state').eq('room_code',room.code).maybeSingle();if(data?.state&&(data.state.revision||0)>=(room.revision||0)){room=data.state;isHost=room.hostId?room.hostId===localPlayerId:isHost;render()}}
 async function publish(){if(!supabase||!room)return;room.updatedAt=Date.now();room.revision=(room.revision||0)+1;const snapshot=structuredClone(room);const {error}=await supabase.from('ludo_rooms').update({state:snapshot,updated_at:new Date().toISOString()}).eq('room_code',room.code);if(error)showToast('Sync issue: '+error.message);}
 async function leaveRoom(){if(channel){await supabase.removeChannel(channel);channel=null}room=null;isHost=false;setViews(false);setConnection(false)}
 function coordFor(player,progress,index){if(progress===-1){const base={red:[2.0,2.0],green:[11.0,2.0],yellow:[11.0,11.0],blue:[2.0,11.0]}[player.color];const offsets=[[0,0],[1.5,0],[0,1.5],[1.5,1.5]][index];return [base[0]+offsets[0],base[1]+offsets[1]]}if(progress>=51){const [x,y]=LANES[player.color][Math.min(5,progress-51)];return [x,y]}const [x,y]=TRACK[(STARTS[player.color]+progress)%52];return [x,y]}
@@ -105,9 +106,9 @@ function render(){if(!room)return;makeBoard();renderTokens();$('room-code-displa
     $('shuffle-teams').disabled=room.players.length!==4||room.status==='finished'||!isHost;
     $('shuffle-teams').title=isHost?'Randomly reassign two players to each team':'Only the room host can shuffle teams';
   }
-  const cp=currentPlayer();$('turn-name').textContent=room.winner?`${room.winner} wins!`:cp?.name||'Waitingâ?';$('turn-hint').textContent=room.winner?'Game complete':(room.teamMode&&room.players.length<4)?'Waiting for all four teammates':cp?.id===localPlayerId?'Your turn â? make a move':`${cp?.name||'Player'} is playing`;$('turn-avatar').className=`turn-avatar ${cp?.color||'red'}`;$('dice').textContent=room.dice??'â?';$('game-message').textContent=room.message||'';
+  const cp=currentPlayer();$('turn-name').textContent=room.winner?`${room.winner} wins!`:cp?.name||'Waitingâ?';$('turn-hint').textContent=room.winner?'Game complete':room.status==='waiting'?(isRoomHost()?'Start when your players are ready':'Waiting for the host to start'):(room.teamMode&&room.players.length<4)?'Waiting for all four teammates':cp?.id===localPlayerId?'Your turn â? make a move':`${cp?.name||'Player'} is playing`;$('turn-avatar').className=`turn-avatar ${cp?.color||'red'}`;$('dice').textContent=room.dice??'â?';$('game-message').textContent=room.message||'';
   const myTurn=cp?.id===localPlayerId&&!room.winner&&room.status==='playing';$('roll-dice').disabled=!myTurn||!!room.dice||(room.teamMode?room.players.length<4:room.players.length<2)||busy;$('roll-dice').innerHTML=room.dice?'Choose a glowing token':'Roll the dice <span>🎲</span>';
-  const startBtn=$('start-game');startBtn.classList.toggle('hidden',!isHost||room.status!=='waiting');startBtn.disabled=!canStartGame();startBtn.textContent=canStartGame()?'Start game':'Waiting for players';
+  const startBtn=$('start-game');startBtn.classList.toggle('hidden',!isRoomHost()||room.status!=='waiting');startBtn.disabled=!canStartGame();startBtn.textContent=canStartGame()?'Start game':'Waiting for players';
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function isLegalMove(player,index,roll){const pos=player.tokens[index];if(pos===57)return false;if(pos===-1)return roll===6;if(pos+roll>57)return false;return true}
