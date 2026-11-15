@@ -39,10 +39,22 @@ function teamHasWon(team){
   return members.length===2 && members.every(p=>p.tokens.every(t=>t===57));
 }
 function showToast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200)}
-function playSound(type){if(!soundEnabled)return;try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return;audioContext=audioContext||new Ctx();if(audioContext.state==='suspended')audioContext.resume();const now=audioContext.currentTime;const patterns={roll:[[220,.07],[330,.07],[440,.12]],move:[[520,.08],[660,.1]],release:[[392,.09],[587,.14]],safe:[[660,.1],[880,.16]],capture:[[260,.12],[180,.18]]};(patterns[type]||patterns.move).forEach(([freq,d],i)=>{const o=audioContext.createOscillator(),g=audioContext.createGain();o.type=type==='roll'?'triangle':'sine';o.frequency.setValueAtTime(freq,now+i*.09);g.gain.setValueAtTime(.0001,now+i*.09);g.gain.exponentialRampToValueAtTime(.12,now+i*.09+.015);g.gain.exponentialRampToValueAtTime(.0001,now+i*.09+d);o.connect(g);g.connect(audioContext.destination);o.start(now+i*.09);o.stop(now+i*.09+d+.02);});}catch(e){}}
+function unlockAudio(){
+  try{const Ctx=window.AudioContext||window.webkitAudioContext;if(!Ctx)return null;audioContext=audioContext||new Ctx();if(audioContext.state==='suspended')audioContext.resume();return audioContext;}catch(e){return null}
+}
+function playSound(type){
+  if(!soundEnabled)return;
+  const ctx=unlockAudio();if(!ctx)return;
+  const patterns={roll:[[180,.08],[260,.08],[360,.12],[480,.15]],move:[[520,.08],[680,.12]],release:[[330,.1],[520,.1],[740,.16]],safe:[[660,.12],[880,.18],[1040,.2]],capture:[[300,.1],[210,.13],[130,.22]],win:[[523,.12],[659,.12],[784,.18],[1046,.3]]};
+  const notes=patterns[type]||patterns.move;
+  const schedule=()=>{const now=ctx.currentTime;notes.forEach(([freq,d],i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=type==='roll'?'triangle':'sine';o.frequency.setValueAtTime(freq,now+i*.11);g.gain.setValueAtTime(.0001,now+i*.11);g.gain.exponentialRampToValueAtTime(.16,now+i*.11+.015);g.gain.exponentialRampToValueAtTime(.0001,now+i*.11+d);o.connect(g);g.connect(ctx.destination);o.start(now+i*.11);o.stop(now+i*.11+d+.03);});};
+  if(ctx.state==='running')schedule();else ctx.resume().then(()=>{if(ctx.state==='running')schedule()}).catch(()=>{});
+}
+function toggleSound(){soundEnabled=!soundEnabled;$('sound-toggle').textContent=soundEnabled?'Sound: On':'Sound: Off';if(soundEnabled){unlockAudio();playSound('safe')}}
+document.addEventListener('pointerdown',unlockAudio,{once:true}); 
 function toggleSound(){soundEnabled=!soundEnabled;$('sound-toggle').textContent=soundEnabled?'Sound: On':'Sound: Off';if(soundEnabled)playSound('safe')}
 function canStartGame(){return !!room&&(room.teamMode?room.players.length===4:room.players.length>=2)}
-async function startGame(){if(!room||!isRoomHost()||room.status!=='waiting'||!canStartGame())return;room.status='playing';room.turn=0;room.dice=null;room.message=`${getMe()?.name||'Host'} started the game. Good luck!`;await publish();render()}
+async function startGame(){if(!room||!isRoomHost()||room.status!=='waiting'||!canStartGame())return;playSound('win');room.status='playing';room.turn=0;room.dice=null;room.message=`${getMe()?.name||'Host'} started the game. Good luck!`;await publish();render()}
 function setError(msg){$('lobby-error').textContent=msg||''}
 function setConnection(online){$('connection-label').textContent=online?'Live multiplayer':'Offline demo';$('connection-label').previousElementSibling.classList.toggle('live',online)}
 function randomCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<6;i++)s+=chars[Math.floor(Math.random()*chars.length)];return s}
@@ -113,7 +125,7 @@ function render(){if(!room)return;makeBoard();renderTokens();$('room-code-displa
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function isLegalMove(player,index,roll){const pos=player.tokens[index];if(pos===57)return false;if(pos===-1)return roll===6;if(pos+roll>57)return false;return true}
 function rollDice(){if(busy||!room||room.status!=='playing'||currentPlayer()?.id!==localPlayerId||room.dice||(room.teamMode?room.players.length<4:room.players.length<2))return;busy=true;playSound('roll');$('dice').classList.remove('dice-roll');void $('dice').offsetWidth;$('dice').classList.add('dice-roll');const roll=1+Math.floor(Math.random()*6);room.dice=roll;room.lastRoll=roll;const p=currentPlayer();const legal=p.tokens.some((pos,i)=>isLegalMove(p,i,roll));room.message=legal?`${p.name} rolled a ${roll}. Choose a token.`:roll===6?'No legal move â? roll again.':`${p.name} rolled a ${roll}. No legal move.`;render();busy=false;
-  if(!legal){setTimeout(async()=>{if(!room||currentPlayer()?.id!==localPlayerId||room.dice!==roll)return;room.dice=null;if(roll!==6)nextTurn();else room.message='No move available. Roll again!';await publish();render()},900)}else publish();
+  if(!legal){setTimeout(async()=>{if(!room||currentPlayer()?.id!==localPlayerId||room.dice!==roll)return;room.dice=null;if(roll!==6){nextTurn();room.message=`No legal move. Turn passed to ${currentPlayer()?.name||'next player'}.`;}else room.message='No move available. Roll again!';await publish();render()},900)}else publish();
 }
 async function moveToken(playerId,index){if(busy||!room||room.status!=='playing'||currentPlayer()?.id!==localPlayerId)return;const p=room.players.find(p=>p.id===playerId);const roll=room.dice;if(!p||p.id!==localPlayerId||!roll||!isLegalMove(p,index,roll))return;busy=true;const leavingBase=p.tokens[index]===-1;let pos=leavingBase?0:p.tokens[index]+roll;p.tokens[index]=pos;
   let captured=[];if(pos<=50){const square=(STARTS[p.color]+pos)%52;if(!SAFE.includes(square)){room.players.forEach(other=>{if(other.color===p.color)return;other.tokens.forEach((op,oi)=>{if(op>=0&&op<=50&&(STARTS[other.color]+op)%52===square){other.tokens[oi]=-1;captured.push(other.name)}})})}}
