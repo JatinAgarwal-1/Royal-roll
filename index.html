@@ -22,8 +22,8 @@
       <div class="hero-copy"><div class="eyebrow"><span>✦</span> THE CLASSIC, REIMAGINED</div><h1>Game night.<br><span>Any distance.</span></h1><p>Bring your crew together. Create a private table, share the code, and let the good rolls begin.</p></div>
       <div class="lobby-card">
         <div class="card-heading"><div><div class="eyebrow muted">PRIVATE MULTIPLAYER</div><h2>Choose your table</h2></div><div class="four-dots"><i></i><i></i><i></i><i></i></div></div>
-        <label class="field-label" for="player-name">YOUR PLAYER NAME</label>
-        <input id="player-name" class="text-input" maxlength="16" placeholder="Enter your name" autocomplete="nickname" />
+        <label class="field-label" for="player-name">YOUR PLAYER NAME <span aria-hidden="true">*</span></label>
+        <input id="player-name" class="text-input" maxlength="16" required aria-required="true" placeholder="Enter your name" autocomplete="nickname" />
         <label class="mode-choice"><input id="team-mode" type="checkbox" /> <span><b>Team up · 2 vs 2</b><small>Partners sit opposite each other and share the win</small></span></label>
         <button id="create-room" class="primary-btn"><span>＋</span> Create a private room <span class="btn-arrow">↗</span></button>
         <div class="or-divider"><span></span> OR JOIN A FRIEND <span></span></div>
@@ -41,7 +41,7 @@
         <div class="board-wrap"><div id="board" class="board" aria-label="Ludo board"></div><div class="board-glow"></div></div>
         <aside class="game-sidebar">
           <div class="players-panel"><div class="panel-title"><h3>Players</h3><span id="player-count">0 / 4</span></div><div id="players-list" class="players-list"></div><div id="team-controls" class="team-controls hidden"><div id="team-summary" class="team-summary"></div><button id="shuffle-teams" class="secondary-btn shuffle-btn">⇄ Shuffle teams</button></div></div>
-          <div class="turn-panel"><div class="eyebrow muted">CURRENT TURN</div><div class="turn-player"><span id="turn-avatar" class="turn-avatar red"></span><div><strong id="turn-name">Waiting…</strong><small id="turn-hint">The first roll is yours</small></div></div><div id="dice" class="dice" aria-label="Dice result">—</div><button id="start-game" class="primary-btn start-btn hidden" disabled>Start game</button><button id="roll-dice" class="primary-btn roll-btn" disabled>Roll the dice <span>🎲</span></button><button id="sound-toggle" class="secondary-btn sound-btn" type="button">Sound: On</button><p id="game-message" class="game-message" aria-live="polite">Waiting for players to join.</p></div>
+          <div class="turn-panel"><div class="eyebrow muted">CURRENT TURN</div><div class="turn-player"><span id="turn-avatar" class="turn-avatar red"></span><div><strong id="turn-name">Waiting…</strong><small id="turn-hint">The first roll is yours</small></div></div><div id="dice" class="dice" aria-label="Dice">🎲</div><button id="start-game" class="primary-btn start-btn hidden" disabled>Start game</button><button id="roll-dice" class="primary-btn roll-btn" disabled>Roll the dice <span>🎲</span></button><button id="sound-toggle" class="secondary-btn sound-btn" type="button">Sound: On</button><p id="game-message" class="game-message" aria-live="polite">Waiting for players to join.</p></div>
           <div class="rules-note"><span>✦</span><div><b>Quick rules</b><p>Roll a 6 to leave home. Land on an opponent to send them home. Reach the center with an exact roll.</p></div></div>
         </aside>
       </div>
@@ -49,6 +49,6 @@
     <footer><span>ROLL ROYALE</span><span>GOOD FRIENDS. GREAT ROLLS.</span></footer>
   </main>
   <div id="toast" class="toast" role="status"></div>
-  <script type="module" src="app.js?v=rr-20261116-4"></script>
+  <script type="module" src="app.js?v=rr-20261116-5"></script>
 </body>
 </html>
