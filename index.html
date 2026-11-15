@@ -40,7 +40,7 @@
       <div class="game-layout">
         <div class="board-wrap"><div id="board" class="board" aria-label="Ludo board"></div><div class="board-glow"></div></div>
         <aside class="game-sidebar">
-          <div class="players-panel"><div class="panel-title"><h3>Players</h3><span id="player-count">0 / 4</span></div><div id="players-list" class="players-list"></div><div id="team-controls" class="team-controls hidden"><div id="team-summary" class="team-summary"></div><button id="shuffle-teams" class="secondary-btn shuffle-btn">⇄ Shuffle teams</button></div></div>
+          <div id="team-controls" class="team-controls team-controls-standalone hidden"><div id="team-summary" class="team-summary"></div><button id="shuffle-teams" class="secondary-btn shuffle-btn">⇄ Shuffle teams</button></div><div id="players-list" class="hidden" aria-hidden="true"></div><span id="player-count" class="hidden">0 / 4</span>
           <div class="turn-panel"><div class="eyebrow muted">CURRENT TURN</div><div class="turn-player"><span id="turn-avatar" class="turn-avatar red"></span><div><strong id="turn-name">Waiting…</strong><small id="turn-hint">The first roll is yours</small></div></div><button id="dice" class="dice" type="button" aria-label="Tap to roll the dice" title="Tap to roll the dice">🎲</button><button id="start-game" class="primary-btn start-btn hidden" disabled>Start game</button><button id="sound-toggle" class="secondary-btn sound-btn" type="button">Sound: On</button><p id="game-message" class="game-message" aria-live="polite">Waiting for players to join.</p></div>
           <div class="rules-note"><span>✦</span><div><b>Quick rules</b><p>Roll a 6 to leave home. Land on an opponent to send them home. Reach the center with an exact roll.</p></div></div>
         </aside>
@@ -49,6 +49,6 @@
     <footer><span>ROLL ROYALE</span><span>GOOD FRIENDS. GREAT ROLLS.</span></footer>
   </main>
   <div id="toast" class="toast" role="status"></div>
-  <script type="module" src="app.js?v=rr-20261116-8"></script>
+  <script type="module" src="app.js?v=rr-20261116-9"></script>
 </body>
 </html>
