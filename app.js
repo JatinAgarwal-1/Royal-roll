@@ -75,11 +75,13 @@ function setViews(inGame){$('lobby').classList.toggle('hidden',inGame);$('game')
 
 async function createRoom(){
   const button=$('create-room');setError('');
+  const name=$('player-name').value.trim();
+  if(!name){$('player-name').focus();setError('Please enter your player name before creating a room.');return}
   if(button.disabled)return;
   button.disabled=true;button.textContent='Creating room…';
   try{
     await ensureSupabase();
-    const name=$('player-name').value.trim()||'Player 1';let created=false,lastError=null;
+    let created=false,lastError=null;
     for(let attempt=0;attempt<3&&!created;attempt++){
       const code=randomCode(),host=newPlayer(name,'red',localPlayerId),nextRoom=initialState(code,host,$('team-mode').checked);
       if(nextRoom.teamMode){const pairs={red:'A',yellow:'A',green:'B',blue:'B'};nextRoom.players.forEach(p=>p.team=pairs[p.color]);}
@@ -93,6 +95,8 @@ async function createRoom(){
 }
 async function joinRoom(){
   setError('');
+  const name=$('player-name').value.trim();
+  if(!name){$('player-name').focus();setError('Please enter your player name before joining a room.');return}
   try{await ensureSupabase();}catch(err){setError(err?.message||String(err));return}
   const code=$('room-code-input').value.trim().toUpperCase(); if(code.length!==6){setError('Enter the 6-character room code.');return}
   const {data,error}=await supabase.from('ludo_rooms').select('state').eq('room_code',code).maybeSingle();
@@ -100,7 +104,7 @@ async function joinRoom(){
   room=data.state; isHost=room.hostId?room.hostId===localPlayerId:isHost; if(room.status==='finished'){setError('This game has already finished. Create a new room.');return}
   if(room.players.some(p=>p.id===localPlayerId)){isHost=false;await enterGame();return}
   if(room.players.length>=4){setError('This room is full (4 players).');return}
-  const seats=room.teamMode?COLORS:['red','yellow','green','blue']; const color=seats[room.players.length]; room.players.push(newPlayer($('player-name').value.trim()||`Player ${room.players.length+1}`,color,localPlayerId));
+  const seats=room.teamMode?COLORS:['red','yellow','green','blue']; const color=seats[room.players.length]; room.players.push(newPlayer(name,color,localPlayerId));
   if(room.teamMode){
     assignDefaultTeams();
     if($('shuffle-on-join').checked)room.shuffleTeamsOnFull=true;
@@ -127,7 +131,7 @@ function makeBoard(){const board=$('board');board.innerHTML='';
   const center=document.createElement('div');center.className='center-home';board.append(center);
 }
 function renderTokens(){document.querySelectorAll('.token').forEach(e=>e.remove());if(!room)return;
-  room.players.forEach(p=>p.tokens.forEach((progress,i)=>{const [x,y]=coordFor(p,progress,i);const token=document.createElement('button');token.className=`token ${p.color}`;if(room.lastMove?.playerId===p.id&&room.lastMove?.index===i){token.classList.add('token-moved');if(room.lastMove.safe)token.classList.add('token-safe');if(room.lastMove.fromBase)token.classList.add('token-release')}token.style.left=`${(x+.5)/15*100}%`;token.style.top=`${(y+.5)/15*100}%`;token.textContent=String(i+1);token.setAttribute('aria-label',`${p.name}, token ${i+1}`);const movable=room.dice&&currentPlayer()?.id===localPlayerId&&isLegalMove(p,i,room.dice);if(movable)token.classList.add('movable');token.disabled=!movable||busy;token.addEventListener('click',()=>moveToken(p.id,i));$('board').append(token)}));
+  room.players.forEach(p=>p.tokens.forEach((progress,i)=>{const [x,y]=coordFor(p,progress,i);const token=document.createElement('button');token.className=`token ${p.color}`;if(room.lastMove?.playerId===p.id&&room.lastMove?.index===i){token.classList.add('token-moved');if(room.lastMove.safe)token.classList.add('token-safe');if(room.lastMove.fromBase)token.classList.add('token-release')}token.style.left=`${(x+.5)/15*100}%`;token.style.top=`${(y+.5)/15*100}%`;token.textContent=String(i+1);token.setAttribute('aria-label',`${p.name}, token ${i+1}`);const movable=!!room.dice&&currentPlayer()?.id===localPlayerId&&p.id===localPlayerId&&isLegalMove(p,i,room.dice);if(movable)token.classList.add('movable');token.disabled=!movable||busy;token.addEventListener('click',()=>moveToken(p.id,i));$('board').append(token)}));
 }
 function render(){if(!room)return;makeBoard();renderTokens();$('room-code-display').textContent=room.code;$('room-subtitle').textContent=room.status==='waiting'?'Waiting for your crewâ?':room.status==='finished'?`${room.winner} won the game!`:(room.teamMode?'2 vs 2 team battle':'Free-for-all');
   $('player-count').textContent=`${room.players.length} / 4`;
@@ -139,14 +143,28 @@ function render(){if(!room)return;makeBoard();renderTokens();$('room-code-displa
     $('shuffle-teams').disabled=room.players.length!==4||room.status==='finished'||!isHost;
     $('shuffle-teams').title=isHost?'Randomly reassign two players to each team':'Only the room host can shuffle teams';
   }
-  const cp=currentPlayer();$('turn-name').textContent=room.winner?`${room.winner} wins!`:cp?.name||'Waitingâ?';$('turn-hint').textContent=room.winner?'Game complete':room.status==='waiting'?(isRoomHost()?'Start when your players are ready':'Waiting for the host to start'):(room.teamMode&&room.players.length<4)?'Waiting for all four teammates':cp?.id===localPlayerId?'Your turn â? make a move':`${cp?.name||'Player'} is playing`;$('turn-avatar').className=`turn-avatar ${cp?.color||'red'}`;$('dice').textContent=room.dice??'â?';$('game-message').textContent=room.message||'';
+  const cp=currentPlayer();$('turn-name').textContent=room.winner?`${room.winner} wins!`:cp?.name||'Waitingâ?';$('turn-hint').textContent=room.winner?'Game complete':room.status==='waiting'?(isRoomHost()?'Start when your players are ready':'Waiting for the host to start'):(room.teamMode&&room.players.length<4)?'Waiting for all four teammates':cp?.id===localPlayerId?'Your turn â? make a move':`${cp?.name||'Player'} is playing`;$('turn-avatar').className=`turn-avatar ${cp?.color||'red'}`;$('dice').textContent=room.dice??'🎲';$('game-message').textContent=room.message||'';
   const myTurn=cp?.id===localPlayerId&&!room.winner&&room.status==='playing';$('roll-dice').disabled=!myTurn||!!room.dice||(room.teamMode?room.players.length<4:room.players.length<2)||busy;$('roll-dice').innerHTML=room.dice?'Choose a glowing token':'Roll the dice <span>🎲</span>';
   const startBtn=$('start-game');startBtn.classList.toggle('hidden',!isRoomHost()||room.status!=='waiting');startBtn.disabled=!canStartGame();startBtn.textContent=canStartGame()?'Start game':'Waiting for players';
 }
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function isLegalMove(player,index,roll){const pos=player.tokens[index];if(pos===57)return false;if(pos===-1)return roll===6;if(pos+roll>57)return false;return true}
-function rollDice(){if(busy||!room||room.status!=='playing'||currentPlayer()?.id!==localPlayerId||room.dice||(room.teamMode?room.players.length<4:room.players.length<2))return;busy=true;playSound('roll');$('dice').classList.remove('dice-roll');void $('dice').offsetWidth;$('dice').classList.add('dice-roll');const roll=1+Math.floor(Math.random()*6);room.dice=roll;room.lastRoll=roll;const p=currentPlayer();const legal=p.tokens.some((pos,i)=>isLegalMove(p,i,roll));room.message=legal?`${p.name} rolled a ${roll}. Choose a token.`:roll===6?'No legal move â? roll again.':`${p.name} rolled a ${roll}. No legal move.`;render();busy=false;
-  if(!legal){setTimeout(async()=>{if(!room||currentPlayer()?.id!==localPlayerId||room.dice!==roll)return;room.dice=null;if(roll!==6){nextTurn();room.message=`No legal move. Turn passed to ${currentPlayer()?.name||'next player'}.`;}else room.message='No move available. Roll again!';await publish();render()},900)}else publish();
+async function rollDice(){
+  if(busy||!room||room.status!=='playing'||currentPlayer()?.id!==localPlayerId||room.dice||(room.teamMode?room.players.length<4:room.players.length<2))return;
+  busy=true;playSound('roll');$('dice').classList.remove('dice-roll');void $('dice').offsetWidth;$('dice').classList.add('dice-roll');
+  const roll=1+Math.floor(Math.random()*6);room.dice=roll;room.lastRoll=roll;
+  const p=currentPlayer();const legalMoves=p.tokens.map((pos,i)=>isLegalMove(p,i,roll)?i:-1).filter(i=>i>=0);
+  room.message=legalMoves.length===1?`${p.name} rolled a ${roll}. Only one move available — moving token ${legalMoves[0]+1} automatically.`:legalMoves.length>1?`${p.name} rolled a ${roll}. Choose a token.`:roll===6?'No legal move — roll again!':`${p.name} rolled a ${roll}. No legal move.`;
+  render();busy=false;
+  if(!legalMoves.length){
+    setTimeout(async()=>{if(!room||currentPlayer()?.id!==localPlayerId||room.dice!==roll)return;room.dice=null;if(roll!==6){nextTurn();room.message=`No legal move. Turn passed to ${currentPlayer()?.name||'next player'}.`;}else room.message='No move available. Roll again!';await publish();render()},900);
+    await publish();return;
+  }
+  await publish();
+  if(legalMoves.length===1){
+    const roomCode=room.code,playerId=p.id,index=legalMoves[0];
+    setTimeout(()=>{if(room?.code===roomCode&&room.status==='playing'&&currentPlayer()?.id===playerId&&room.dice===roll)moveToken(playerId,index)},550);
+  }
 }
 async function moveToken(playerId,index){if(busy||!room||room.status!=='playing'||currentPlayer()?.id!==localPlayerId)return;const p=room.players.find(p=>p.id===playerId);const roll=room.dice;if(!p||p.id!==localPlayerId||!roll||!isLegalMove(p,index,roll))return;busy=true;const leavingBase=p.tokens[index]===-1;let pos=leavingBase?0:p.tokens[index]+roll;p.tokens[index]=pos;
   let captured=[];if(pos<=50){const square=(STARTS[p.color]+pos)%52;if(!SAFE.includes(square)){room.players.forEach(other=>{if(other.color===p.color)return;other.tokens.forEach((op,oi)=>{if(op>=0&&op<=50&&(STARTS[other.color]+op)%52===square){other.tokens[oi]=-1;captured.push(other.name)}})})}}
