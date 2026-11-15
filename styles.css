@@ -34,3 +34,6 @@
 @keyframes tokenSafe{0%{scale:1}35%{scale:1.35;box-shadow:0 0 0 10px rgba(255,211,105,.4),0 0 24px rgba(255,211,105,.9)}100%{scale:1;box-shadow:0 2px 5px rgba(0,0,0,.3)}}
 
 .error-text{display:block;white-space:normal;overflow-wrap:anywhere;line-height:1.5;min-height:18px}.primary-btn:disabled{cursor:wait}
+
+/* Avoid a persistent touch-focus ring being mistaken for a legal-move highlight. */
+.token:focus:not(:focus-visible){outline:none;outline-offset:0}
