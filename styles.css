@@ -52,3 +52,9 @@ button.dice:not(:disabled):active{transform:scale(.94)}
 .home-triangle.yellow{background:#ffcf5b;clip-path:polygon(100% 0,100% 100%,50% 50%)}
 .home-triangle.blue{background:#68a3ff;clip-path:polygon(0 100%,100% 100%,50% 50%)}
 .home-center-dot{position:absolute;left:36%;top:36%;width:28%;height:28%;border-radius:50%;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+
+/* Player names live on their coloured Ludo home quadrant. */
+.base{position:relative;overflow:hidden}
+.base-name{position:absolute;top:5%;left:7%;right:7%;z-index:3;text-align:center;color:#fff;font:800 clamp(7px,1.15vw,12px) 'DM Sans',sans-serif;letter-spacing:.15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 3px rgba(0,0,0,.32);pointer-events:none}
+.base-inner{margin-top:5%}
+@media(max-width:680px){.base-name{font-size:clamp(7px,2vw,10px);top:5%}}
