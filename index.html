@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#101827" />
+  <title>Roll Royale — Multiplayer Ludo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="ambient ambient-one"></div><div class="ambient ambient-two"></div>
+  <main class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Roll Royale home"><span class="brand-mark">✦</span><span>ROLL<span class="brand-accent"> ROYALE</span></span></a>
+      <div class="topbar-right"><span class="online-dot"></span><span id="connection-label">Offline demo</span></div>
+    </header>
+
+    <section id="lobby" class="lobby-view">
+      <div class="hero-copy"><div class="eyebrow"><span>✦</span> THE CLASSIC, REIMAGINED</div><h1>Game night.<br><span>Any distance.</span></h1><p>Bring your crew together. Create a private table, share the code, and let the good rolls begin.</p></div>
+      <div class="lobby-card">
+        <div class="card-heading"><div><div class="eyebrow muted">PRIVATE MULTIPLAYER</div><h2>Choose your table</h2></div><div class="four-dots"><i></i><i></i><i></i><i></i></div></div>
+        <label class="field-label" for="player-name">YOUR PLAYER NAME</label>
+        <input id="player-name" class="text-input" maxlength="16" placeholder="Enter your name" autocomplete="nickname" />
+        <label class="mode-choice"><input id="team-mode" type="checkbox" checked /> <span><b>Team up · 2 vs 2</b><small>Partners sit opposite each other and share the win</small></span></label>
+        <button id="create-room" class="primary-btn"><span>＋</span> Create a private room <span class="btn-arrow">↗</span></button>
+        <div class="or-divider"><span></span> OR JOIN A FRIEND <span></span></div>
+        <div class="join-row"><input id="room-code-input" class="text-input code-input" maxlength="6" placeholder="ROOM CODE" autocomplete="off"/><button id="join-room" class="secondary-btn">Join room <span>→</span></button></div>
+        <label class="mode-choice join-shuffle"><input id="shuffle-on-join" type="checkbox" /> <span><b>Shuffle teams when room is full</b><small>Randomly split all four players into two teams</small></span></label>
+        <p class="lobby-note"><span>🔒</span> Up to 4 players · Invite-only rooms · Free to play</p>
+        <p id="lobby-error" class="error-text" role="alert"></p>
+      </div>
+      <div class="feature-row"><div><b>01</b><span>Make a room</span></div><div><b>02</b><span>Share the code</span></div><div><b>03</b><span>Roll together</span></div></div>
+    </section>
+
+    <section id="game" class="game-view hidden">
+      <div class="game-heading"><div><button id="leave-room" class="back-link">← Leave table</button><h1>Your table</h1><p id="room-subtitle">Waiting for your crew…</p></div><div class="room-code-box"><span>ROOM CODE</span><strong id="room-code-display">------</strong><button id="copy-code" title="Copy room code">Copy ↗</button></div></div>
+      <div class="game-layout">
+        <div class="board-wrap"><div id="board" class="board" aria-label="Ludo board"></div><div class="board-glow"></div></div>
+        <aside class="game-sidebar">
+          <div class="players-panel"><div class="panel-title"><h3>Players</h3><span id="player-count">0 / 4</span></div><div id="players-list" class="players-list"></div><div id="team-controls" class="team-controls hidden"><div id="team-summary" class="team-summary"></div><button id="shuffle-teams" class="secondary-btn shuffle-btn">⇄ Shuffle teams</button></div></div>
+          <div class="turn-panel"><div class="eyebrow muted">CURRENT TURN</div><div class="turn-player"><span id="turn-avatar" class="turn-avatar red"></span><div><strong id="turn-name">Waiting…</strong><small id="turn-hint">The first roll is yours</small></div></div><div id="dice" class="dice" aria-label="Dice result">—</div><button id="roll-dice" class="primary-btn roll-btn" disabled>Roll the dice <span>🎲</span></button><p id="game-message" class="game-message" aria-live="polite">Waiting for players to join.</p></div>
+          <div class="rules-note"><span>✦</span><div><b>Quick rules</b><p>Roll a 6 to leave home. Land on an opponent to send them home. Reach the center with an exact roll.</p></div></div>
+        </aside>
+      </div>
+    </section>
+    <footer><span>ROLL ROYALE</span><span>GOOD FRIENDS. GREAT ROLLS.</span></footer>
+  </main>
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,121 @@
+import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+
+// Add your Supabase Project URL and anon/publishable key here (never use service_role).
+const SUPABASE_URL = 'https://xkltfcpfrnrcdjcnzvmv.supabase.co/rest/v1/';
+const SUPABASE_ANON_KEY = 'sb_publishable_JUh8KHF3yT876jLxev5ehA_cO5Olew-';
+const supabaseConfigured = SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
+const supabase = supabaseConfigured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+const COLORS = ['red','green','yellow','blue'];
+const COLOR_NAMES = {red:'Red',green:'Green',yellow:'Yellow',blue:'Blue'};
+const STARTS = {red:0,green:13,yellow:26,blue:39};
+const SAFE = [0,8,13,21,26,34,39,47];
+const TRACK = [[1,6],[2,6],[3,6],[4,6],[5,6],[6,5],[6,4],[6,3],[6,2],[6,1],[6,0],[7,0],[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[9,6],[10,6],[11,6],[12,6],[13,6],[14,6],[14,7],[14,8],[13,8],[12,8],[11,8],[10,8],[9,8],[8,9],[8,10],[8,11],[8,12],[8,13],[8,14],[7,14],[6,14],[6,13],[6,12],[6,11],[6,10],[6,9],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8],[0,7],[0,6]];
+const LANES = {red:[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],green:[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],yellow:[[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],blue:[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]]};
+const BASES = [{color:'red',x:0,y:0},{color:'green',x:9,y:0},{color:'yellow',x:9,y:9},{color:'blue',x:0,y:9}];
+const $ = id => document.getElementById(id);
+let room = null, channel = null, localPlayerId = localStorage.getItem('rr-player-id') || crypto.randomUUID();
+localStorage.setItem('rr-player-id',localPlayerId);
+let isHost = false, busy = false, toastTimer;
+
+function initialState(code, host, teamMode=true) { return {code, status:'waiting', teamMode, shuffleTeamsOnFull:false, players:[host], turn:0, dice:null, lastRoll:null, message:'Waiting for players to join.', winner:null, updatedAt:Date.now(), revision:0}; }
+function newPlayer(name,color,id=crypto.randomUUID(),team=null) { return {id,name,color,team,tokens:[-1,-1,-1,-1],connected:true}; }
+function teamName(team){return team==='A'?'Team Sun':'Team Moon'}
+function shuffleTeamsLocal(){
+  const shuffled=[...room.players].sort(()=>Math.random()-.5);
+  shuffled.forEach((p,i)=>p.team=i<2?'A':'B');
+}
+function shuffleTeams(){
+  if(!room||!room.teamMode||room.players.length!==4||!isHost)return;
+  shuffleTeamsLocal(); room.message='Teams shuffled! Two players on each side. Good luck!';
+  publish();render();
+}
+function assignDefaultTeams(){
+  const pairs={red:'A',yellow:'A',green:'B',blue:'B'};
+  room.players.forEach(p=>p.team=pairs[p.color]);
+}
+function teamHasWon(team){
+  const members=room.players.filter(p=>p.team===team);
+  return members.length===2 && members.every(p=>p.tokens.every(t=>t===57));
+}
+function showToast(msg){const el=$('toast');el.textContent=msg;el.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove('show'),2200)}
+function setError(msg){$('lobby-error').textContent=msg||''}
+function setConnection(online){$('connection-label').textContent=online?'Live multiplayer':'Offline demo';$('connection-label').previousElementSibling.classList.toggle('live',online)}
+function randomCode(){const chars='ABCDEFGHJKLMNPQRSTUVWXYZ23456789';let s='';for(let i=0;i<6;i++)s+=chars[Math.floor(Math.random()*chars.length)];return s}
+function getMe(){return room?.players.find(p=>p.id===localPlayerId)}
+function currentPlayer(){return room?.players[room.turn]}
+function saveLocal(){localStorage.setItem('rr-last-room',room.code)}
+function setViews(inGame){$('lobby').classList.toggle('hidden',inGame);$('game').classList.toggle('hidden',!inGame)}
+
+async function createRoom(){
+  setError(''); if(!supabase){setError('Add your Supabase URL and anon key in app.js, then run the SQL setup.');return}
+  const name=$('player-name').value.trim()||'Player 1'; const code=randomCode(); const host=newPlayer(name,'red',localPlayerId); room=initialState(code,host,$('team-mode').checked); if(room.teamMode)assignDefaultTeams(); isHost=true;
+  const {error}=await supabase.from('ludo_rooms').insert({room_code:code,state:room});
+  if(error){room=null;setError('Could not create room: '+error.message);return}
+  await enterGame();
+}
+async function joinRoom(){
+  setError(''); if(!supabase){setError('Add your Supabase URL and anon key in app.js, then run the SQL setup.');return}
+  const code=$('room-code-input').value.trim().toUpperCase(); if(code.length!==6){setError('Enter the 6-character room code.');return}
+  const {data,error}=await supabase.from('ludo_rooms').select('state').eq('room_code',code).maybeSingle();
+  if(error||!data){setError('Room not found. Check the code and try again.');return}
+  room=data.state; if(room.status==='finished'){setError('This game has already finished. Create a new room.');return}
+  if(room.players.some(p=>p.id===localPlayerId)){isHost=false;await enterGame();return}
+  if(room.players.length>=4){setError('This room is full (4 players).');return}
+  const color=COLORS[room.players.length]; room.players.push(newPlayer($('player-name').value.trim()||`Player ${room.players.length+1}`,color,localPlayerId));
+  if(room.teamMode){
+    assignDefaultTeams();
+    if($('shuffle-on-join').checked)room.shuffleTeamsOnFull=true;
+    if(room.players.length===4&&room.shuffleTeamsOnFull)shuffleTeamsLocal();
+  }
+  if(room.players.length>=2)room.status='playing';
+  room.message=`${getMe().name} joined the table.`; room.updatedAt=Date.now();room.revision++;
+  const {error:saveError}=await supabase.from('ludo_rooms').update({state:room,updated_at:new Date().toISOString()}).eq('room_code',code);
+  if(saveError){setError('Could not join: '+saveError.message);return}
+  isHost=false;await enterGame();
+}
+async function enterGame(){saveLocal();setViews(true);render();setConnection(true);
+  if(channel)await supabase.removeChannel(channel);
+  channel=supabase.channel(`ludo-${room.code}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'ludo_rooms',filter:`room_code=eq.${room.code}`},payload=>{if(payload.new?.state){const incoming=payload.new.state;if((incoming.revision||0)>=(room.revision||0)){room=incoming;render()}}}).subscribe(status=>{if(status==='SUBSCRIBED')setConnection(true);if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')setConnection(false)});
+  await refreshRoom();
+}
+async function refreshRoom(){if(!supabase||!room)return;const {data}=await supabase.from('ludo_rooms').select('state').eq('room_code',room.code).maybeSingle();if(data?.state&&(data.state.revision||0)>=(room.revision||0)){room=data.state;render()}}
+async function publish(){if(!supabase||!room)return;room.updatedAt=Date.now();room.revision=(room.revision||0)+1;const snapshot=structuredClone(room);const {error}=await supabase.from('ludo_rooms').update({state:snapshot,updated_at:new Date().toISOString()}).eq('room_code',room.code);if(error)showToast('Sync issue: '+error.message);}
+async function leaveRoom(){if(channel){await supabase.removeChannel(channel);channel=null}room=null;isHost=false;setViews(false);setConnection(false)}
+function coordFor(player,progress,index){if(progress===-1){const base={red:[2.0,2.0],green:[11.0,2.0],yellow:[11.0,11.0],blue:[2.0,11.0]}[player.color];const offsets=[[0,0],[1.5,0],[0,1.5],[1.5,1.5]][index];return [base[0]+offsets[0],base[1]+offsets[1]]}if(progress>=51){const [x,y]=LANES[player.color][Math.min(5,progress-51)];return [x,y]}const [x,y]=TRACK[(STARTS[player.color]+progress)%52];return [x,y]}
+function makeBoard(){const board=$('board');board.innerHTML='';
+  BASES.forEach(({color,x,y})=>{const base=document.createElement('div');base.className=`base ${color}`;base.style.gridColumn=`${x+1}/span 6`;base.style.gridRow=`${y+1}/span 6`;base.innerHTML=`<div class="base-inner">${[0,1,2,3].map(()=>`<i class="base-token" style="--token:var(--${color})"></i>`).join('')}</div>`;board.append(base)});
+  TRACK.forEach(([x,y],i)=>{const cell=document.createElement('div');cell.className='track-cell'+(SAFE.includes(i)?' safe':'');cell.style.left=`${(x+.5)/15*100}%`;cell.style.top=`${(y+.5)/15*100}%`;board.append(cell)});
+  Object.entries(LANES).forEach(([color,cells])=>cells.forEach(([x,y])=>{const el=document.createElement('div');el.className=`track-cell lane ${color}`;el.style.left=`${(x+.5)/15*100}%`;el.style.top=`${(y+.5)/15*100}%`;board.append(el)}));
+  const center=document.createElement('div');center.className='center-home';board.append(center);
+}
+function renderTokens(){document.querySelectorAll('.token').forEach(e=>e.remove());if(!room)return;
+  room.players.forEach(p=>p.tokens.forEach((progress,i)=>{const [x,y]=coordFor(p,progress,i);const token=document.createElement('button');token.className=`token ${p.color}`;token.style.left=`${(x+.5)/15*100}%`;token.style.top=`${(y+.5)/15*100}%`;token.textContent=String(i+1);token.setAttribute('aria-label',`${p.name}, token ${i+1}`);const movable=room.dice&&currentPlayer()?.id===localPlayerId&&isLegalMove(p,i,room.dice);if(movable)token.classList.add('movable');token.disabled=!movable||busy;token.addEventListener('click',()=>moveToken(p.id,i));$('board').append(token)}));
+}
+function render(){if(!room)return;makeBoard();renderTokens();$('room-code-display').textContent=room.code;$('room-subtitle').textContent=room.status==='waiting'?'Waiting for your crewâ€?':room.status==='finished'?`${room.winner} won the game!`:(room.teamMode?'2 vs 2 team battle':'Free-for-all');
+  $('player-count').textContent=`${room.players.length} / 4`;
+  $('players-list').innerHTML=COLORS.map(c=>{const p=room.players.find(p=>p.color===c);return `<div class="player-row" style="--player:var(--${c})"><i class="player-dot"></i><div class="player-info"><b>${p?escapeHtml(p.name):'Waiting for player'}</b><small>${p?`${p.tokens.filter(t=>t===57).length}/4 home${room.teamMode?' Â· '+teamName(p.team):''}`:'Open seat'}</small></div><span class="player-state">${p?(p.id===localPlayerId?'YOU':(room.players[room.turn]?.id===p.id?'TURN':'')):'â€?'}</span></div>`}).join('');
+  const teamControls=$('team-controls');teamControls.classList.toggle('hidden',!room.teamMode);
+  if(room.teamMode){
+    const a=room.players.filter(p=>p.team==='A'),b=room.players.filter(p=>p.team==='B');
+    $('team-summary').innerHTML=`<span class="team-pill sun">â˜€ Team Sun: ${a.map(p=>escapeHtml(p.name)).join(' + ')||'Waiting'}</span><span class="team-pill moon">â˜? Team Moon: ${b.map(p=>escapeHtml(p.name)).join(' + ')||'Waiting'}</span>`;
+    $('shuffle-teams').disabled=room.players.length!==4||room.status==='finished'||!isHost;
+    $('shuffle-teams').title=isHost?'Randomly reassign two players to each team':'Only the room host can shuffle teams';
+  }
+  const cp=currentPlayer();$('turn-name').textContent=room.winner?`${room.winner} wins!`:cp?.name||'Waitingâ€?';$('turn-hint').textContent=room.winner?'Game complete':(room.teamMode&&room.players.length<4)?'Waiting for all four teammates':cp?.id===localPlayerId?'Your turn â€? make a move':`${cp?.name||'Player'} is playing`;$('turn-avatar').className=`turn-avatar ${cp?.color||'red'}`;$('dice').textContent=room.dice??'â€?';$('game-message').textContent=room.message||'';
+  const myTurn=cp?.id===localPlayerId&&!room.winner;$('roll-dice').disabled=!myTurn||!!room.dice||(room.teamMode?room.players.length<4:room.players.length<2)||busy;$('roll-dice').innerHTML=room.dice?'Choose a glowing token':'Roll the dice <span>ðŸŽ²</span>';
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function isLegalMove(player,index,roll){const pos=player.tokens[index];if(pos===57)return false;if(pos===-1)return roll===6;if(pos+roll>57)return false;return true}
+function rollDice(){if(busy||!room||currentPlayer()?.id!==localPlayerId||room.dice||(room.teamMode?room.players.length<4:room.players.length<2))return;busy=true;const roll=1+Math.floor(Math.random()*6);room.dice=roll;room.lastRoll=roll;const p=currentPlayer();const legal=p.tokens.some((pos,i)=>isLegalMove(p,i,roll));room.message=legal?`${p.name} rolled a ${roll}. Choose a token.`:roll===6?'No legal move â€? roll again.':`${p.name} rolled a ${roll}. No legal move.`;render();busy=false;
+  if(!legal){setTimeout(async()=>{if(!room||currentPlayer()?.id!==localPlayerId||room.dice!==roll)return;room.dice=null;if(roll!==6)nextTurn();else room.message='No move available. Roll again!';await publish();render()},900)}else publish();
+}
+async function moveToken(playerId,index){if(busy||!room||currentPlayer()?.id!==localPlayerId)return;const p=room.players.find(p=>p.id===playerId);const roll=room.dice;if(!p||p.id!==localPlayerId||!roll||!isLegalMove(p,index,roll))return;busy=true;let pos=p.tokens[index];pos=pos===-1?0:pos+roll;p.tokens[index]=pos;
+  let captured=[];if(pos<=50){const square=(STARTS[p.color]+pos)%52;if(!SAFE.includes(square)){room.players.forEach(other=>{if(other.color===p.color)return;other.tokens.forEach((op,oi)=>{if(op>=0&&op<=50&&(STARTS[other.color]+op)%52===square){other.tokens[oi]=-1;captured.push(other.name)}})})}}
+  if(room.teamMode?teamHasWon(p.team):p.tokens.every(t=>t===57)){room.status='finished';room.winner=room.teamMode?teamName(p.team):p.name;room.message=room.teamMode?`${teamName(p.team)} wins together! ðŸŽ‰`:`${p.name} wins the game! ðŸŽ‰`;room.dice=null}else{room.message=`${p.name} moved token ${index+1}${captured.length?` and captured ${captured.join(', ')}!`:''}`;if(roll!==6&&captured.length===0)nextTurn();room.dice=null}
+  await publish();render();busy=false;
+}
+function nextTurn(){if(!room.players.length)return;room.turn=(room.turn+1)%room.players.length;room.dice=null}
+async function copyCode(){if(!room)return;try{await navigator.clipboard.writeText(room.code);showToast('Room code copied!')}catch{showToast(`Room code: ${room.code}`)}}
+$('create-room').addEventListener('click',createRoom);$('join-room').addEventListener('click',joinRoom);$('roll-dice').addEventListener('click',rollDice);$('leave-room').addEventListener('click',leaveRoom);$('copy-code').addEventListener('click',copyCode);$('shuffle-teams').addEventListener('click',shuffleTeams);$('room-code-input').addEventListener('input',e=>e.target.value=e.target.value.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6));
+if(!supabaseConfigured){$('connection-label').textContent='Setup required';$('lobby-error').textContent='Connect Supabase to enable online rooms. See README.md for setup.'}
