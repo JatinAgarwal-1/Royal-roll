@@ -1,10 +1,20 @@
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-
-// Add your Supabase Project URL and anon/publishable key here (never use service_role).
+// Load Supabase on demand so a CDN/import failure cannot prevent lobby buttons
+// from being registered. Failures are shown in the lobby when the user taps.
 const SUPABASE_URL = 'https://xkltfcpfrnrcdjcnzvmv.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_JUh8KHF3yT876jLxev5ehA_cO5Olew-';
 const supabaseConfigured = SUPABASE_URL.startsWith('https://') && !SUPABASE_URL.includes('YOUR_') && !SUPABASE_ANON_KEY.includes('YOUR_');
-const supabase = supabaseConfigured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+let supabase = null;
+let supabasePromise = null;
+async function ensureSupabase(){
+  if(!supabaseConfigured) throw new Error('Supabase URL or publishable key is missing.');
+  if(supabase) return supabase;
+  if(!supabasePromise){
+    supabasePromise = import('https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm')
+      .then(({createClient}) => { supabase = createClient(SUPABASE_URL,SUPABASE_ANON_KEY); return supabase; })
+      .catch(err => { supabasePromise = null; throw new Error('Could not load the online service. Check your internet connection and refresh. '+(err?.message||'')); });
+  }
+  return supabasePromise;
+}
 
 const COLORS = ['red','green','yellow','blue'];
 const COLOR_NAMES = {red:'Red',green:'Green',yellow:'Yellow',blue:'Blue'};
@@ -50,8 +60,7 @@ function playSound(type){
   const schedule=()=>{const now=ctx.currentTime;notes.forEach(([freq,d],i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=type==='roll'?'triangle':'sine';o.frequency.setValueAtTime(freq,now+i*.11);g.gain.setValueAtTime(.0001,now+i*.11);g.gain.exponentialRampToValueAtTime(.16,now+i*.11+.015);g.gain.exponentialRampToValueAtTime(.0001,now+i*.11+d);o.connect(g);g.connect(ctx.destination);o.start(now+i*.11);o.stop(now+i*.11+d+.03);});};
   if(ctx.state==='running')schedule();else ctx.resume().then(()=>{if(ctx.state==='running')schedule()}).catch(()=>{});
 }
-function toggleSound(){soundEnabled=!soundEnabled;$('sound-toggle').textContent=soundEnabled?'Sound: On':'Sound: Off';if(soundEnabled){unlockAudio();playSound('safe')}}
-document.addEventListener('pointerdown',unlockAudio,{once:true}); 
+document.addEventListener('pointerdown',unlockAudio,{once:true});
 function toggleSound(){soundEnabled=!soundEnabled;$('sound-toggle').textContent=soundEnabled?'Sound: On':'Sound: Off';if(soundEnabled)playSound('safe')}
 function canStartGame(){return !!room&&(room.teamMode?room.players.length===4:room.players.length>=2)}
 async function startGame(){if(!room||!isRoomHost()||room.status!=='waiting'||!canStartGame())return;playSound('win');room.status='playing';room.turn=0;room.dice=null;room.message=`${getMe()?.name||'Host'} started the game. Good luck!`;await publish();render()}
@@ -66,10 +75,10 @@ function setViews(inGame){$('lobby').classList.toggle('hidden',inGame);$('game')
 
 async function createRoom(){
   const button=$('create-room');setError('');
-  if(!supabase){setError('Online setup is unavailable: Supabase did not initialize. Refresh and try again.');return}
   if(button.disabled)return;
   button.disabled=true;button.textContent='Creating room…';
   try{
+    await ensureSupabase();
     const name=$('player-name').value.trim()||'Player 1';let created=false,lastError=null;
     for(let attempt=0;attempt<3&&!created;attempt++){
       const code=randomCode(),host=newPlayer(name,'red',localPlayerId),nextRoom=initialState(code,host,$('team-mode').checked);
@@ -79,11 +88,12 @@ async function createRoom(){
     }
     if(!created){room=null;setError('Room creation failed: '+(lastError?.message||lastError?.details||'No response from database.')+' Check Supabase table and RLS policies.');return;}
     await enterGame();
-  }catch(err){room=null;setError('Could not create room: '+(err?.message||String(err))+' Please refresh and try again.');console.error('Roll Royale createRoom error:',err);}
+  }catch(err){room=null;setError('Could not create room: '+(err?.message||String(err)));console.error('Roll Royale createRoom error:',err);}
   finally{button.disabled=false;button.innerHTML='<span>＋</span> Create a private room <span class="btn-arrow">↗</span>';}
 }
 async function joinRoom(){
-  setError(''); if(!supabase){setError('Add your Supabase URL and anon key in app.js, then run the SQL setup.');return}
+  setError('');
+  try{await ensureSupabase();}catch(err){setError(err?.message||String(err));return}
   const code=$('room-code-input').value.trim().toUpperCase(); if(code.length!==6){setError('Enter the 6-character room code.');return}
   const {data,error}=await supabase.from('ludo_rooms').select('state').eq('room_code',code).maybeSingle();
   if(error||!data){setError('Room not found. Check the code and try again.');return}
