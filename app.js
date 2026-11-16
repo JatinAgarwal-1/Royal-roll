@@ -26,7 +26,7 @@ const BASES = [{color:'red',x:0,y:0},{color:'green',x:9,y:0},{color:'yellow',x:9
 const $ = id => document.getElementById(id);
 let room = null, channel = null, localPlayerId = localStorage.getItem('rr-player-id') || crypto.randomUUID();
 localStorage.setItem('rr-player-id',localPlayerId);
-let isHost = false, busy = false, toastTimer, audioContext = null, soundEnabled = true;
+let isHost = false, busy = false, toastTimer, audioContext = null, soundEnabled = true, lastAnimatedMoveKey = '';
 
 function initialState(code, host, teamMode=true) { return {code, hostId:host.id, status:'waiting', teamMode, shuffleTeamsOnFull:false, players:[host], turn:0, dice:null, lastRoll:null, message:'Waiting for players to join.', winner:null, updatedAt:Date.now(), revision:0}; }
 function newPlayer(name,color,id=crypto.randomUUID(),team=null) { return {id,name,color,team,tokens:[-1,-1,-1,-1],connected:true}; }
@@ -123,7 +123,7 @@ async function enterGame(){saveLocal();setViews(true);render();setConnection(tru
 async function refreshRoom(){if(!supabase||!room)return;const {data}=await supabase.from('ludo_rooms').select('state').eq('room_code',room.code).maybeSingle();if(data?.state&&(data.state.revision||0)>=(room.revision||0)){room=data.state;isHost=room.hostId?room.hostId===localPlayerId:isHost;render()}}
 async function publish(){if(!supabase||!room)return;room.updatedAt=Date.now();room.revision=(room.revision||0)+1;const snapshot=structuredClone(room);const {error}=await supabase.from('ludo_rooms').update({state:snapshot,updated_at:new Date().toISOString()}).eq('room_code',room.code);if(error)showToast('Sync issue: '+error.message);}
 async function leaveRoom(){if(channel){await supabase.removeChannel(channel);channel=null}room=null;isHost=false;setViews(false);setConnection(false)}
-function coordFor(player,progress,index){if(progress===-1){const base={red:[2.0,2.0],green:[11.0,2.0],yellow:[11.0,11.0],blue:[2.0,11.0]}[player.color];const offsets=[[0,0],[1.5,0],[0,1.5],[1.5,1.5]][index];return [base[0]+offsets[0],base[1]+offsets[1]]}if(progress>=51){const [x,y]=LANES[player.color][Math.min(5,progress-51)];return [x,y]}const [x,y]=TRACK[(STARTS[player.color]+progress)%52];return [x,y]}
+function coordFor(player,progress,index){if(progress===57)return [7,7];if(progress===-1){const base={red:[2.0,2.0],green:[11.0,2.0],yellow:[11.0,11.0],blue:[2.0,11.0]}[player.color];const offsets=[[0,0],[1.5,0],[0,1.5],[1.5,1.5]][index];return [base[0]+offsets[0],base[1]+offsets[1]]}if(progress>=51){const [x,y]=LANES[player.color][Math.min(5,progress-51)];return [x,y]}const [x,y]=TRACK[(STARTS[player.color]+progress)%52];return [x,y]}
 function makeBoard(){const board=$('board');board.innerHTML='';
   BASES.forEach(({color,x,y})=>{const base=document.createElement('div');base.className=`base ${color}`;base.style.gridColumn=`${x+1}/span 6`;base.style.gridRow=`${y+1}/span 6`;const player=room?.players?.find(p=>p.color===color);const baseLabel=player?escapeHtml(player.name):(room?.status==='playing'?'':'Waiting');base.innerHTML=`${baseLabel?`<span class="base-name" title="${player?escapeHtml(player.name):'Waiting for player'}">${baseLabel}</span>`:''}<div class="base-inner">${[0,1,2,3].map(()=>`<i class="base-token" style="--token:var(--${color})"></i>`).join('')}</div>`;board.append(base)});
   TRACK.forEach(([x,y],i)=>{const cell=document.createElement('div');const startColor=Object.keys(STARTS).find(color=>STARTS[color]===i);cell.className='track-cell'+(SAFE.includes(i)?' safe':'')+(startColor?` start start-${startColor}`:'');cell.style.left=`${(x+.5)/15*100}%`;cell.style.top=`${(y+.5)/15*100}%`;board.append(cell)});
@@ -134,39 +134,39 @@ function renderTokens(){
   document.querySelectorAll('.token').forEach(e=>e.remove());if(!room)return;
   const entries=[];
   room.players.forEach(p=>p.tokens.forEach((progress,i)=>{
-    const [x,y]=coordFor(p,progress,i);
-    entries.push({p,progress,i,x,y,base:progress===-1});
+    const [x,y]=coordFor(p,progress,i);entries.push({p,progress,i,x,y,base:progress===-1});
   }));
-  // Fan tokens out around a shared square so stacked pieces remain individually visible.
   const stacks=new Map();
-  entries.filter(e=>!e.base).forEach(e=>{
-    const key=`${e.x},${e.y}`;
-    if(!stacks.has(key))stacks.set(key,[]);
-    stacks.get(key).push(e);
-  });
-  const spreadOffsets={
-    2:[[-.30,0],[.30,0]],
-    3:[[0,-.30],[-.30,.27],[.30,.27]],
-    4:[[-.28,-.28],[.28,-.28],[-.28,.28],[.28,.28]]
-  };
+  entries.filter(e=>!e.base).forEach(e=>{const key=`${e.x},${e.y}`;if(!stacks.has(key))stacks.set(key,[]);stacks.get(key).push(e)});
+  const spreadOffsets={2:[[-.30,0],[.30,0]],3:[[0,-.30],[-.30,.27],[.30,.27]],4:[[-.28,-.28],[.28,-.28],[-.28,.28],[.28,.28]]};
   entries.forEach(e=>{
-    const {p,i,x,y,base}=e;
-    const token=document.createElement('button');token.className=`token ${p.color}`;
-    if(room.lastMove?.playerId===p.id&&room.lastMove?.index===i){token.classList.add('token-moved');if(room.lastMove.safe)token.classList.add('token-safe');if(room.lastMove.fromBase)token.classList.add('token-release')}
+    const {p,i,x,y,progress,base}=e,token=document.createElement('button');
+    token.className=`token ${p.color}`;
+    const lm=room.lastMove, isLast=lm?.playerId===p.id&&lm?.index===i;
+    if(isLast){token.classList.add('token-moved');if(lm.safe)token.classList.add('token-safe');if(lm.fromBase)token.classList.add('token-release')}
     let dx=0,dy=0;
-    if(!base){
-      const stack=stacks.get(`${x},${y}`)||[];
-      const index=stack.indexOf(e),offsets=spreadOffsets[stack.length]||[];
-      if(offsets[index]){[dx,dy]=offsets[index]}
-    }
-    token.style.left=`${(x+.5+dx)/15*100}%`;
-    token.style.top=`${(y+.5+dy)/15*100}%`;
+    if(!base){const stack=stacks.get(`${x},${y}`)||[],index=stack.indexOf(e),offsets=spreadOffsets[stack.length]||[];if(offsets[index]){[dx,dy]=offsets[index]}}
+    const endLeft=(x+.5+dx)/15*100,endTop=(y+.5+dy)/15*100;
+    token.style.left=`${endLeft}%`;token.style.top=`${endTop}%`;
     token.style.zIndex=String(5+(stacks.get(`${x},${y}`)||[]).indexOf(e));
     token.innerHTML='<i class="token-shine"></i><i class="token-stud"></i>';
     token.setAttribute('aria-label',`${p.name}, token ${i+1}`);
     const movable=!!room.dice&&currentPlayer()?.id===localPlayerId&&p.id===localPlayerId&&isLegalMove(p,i,room.dice);
     if(movable)token.classList.add('movable');
     token.disabled=!movable||busy;token.addEventListener('click',()=>moveToken(p.id,i));$('board').append(token);
+    if(isLast&&lm.moveId&&lastAnimatedMoveKey!==lm.moveId&&Number.isFinite(lm.fromProgress)&&Number.isFinite(lm.toProgress)){
+      const from=lm.fromProgress,to=lm.toProgress,steps=Math.max(1,to===0&&from===-1?1:to-from);
+      const frames=[];
+      for(let n=0;n<=steps;n++){
+        const prog=from===-1?0:from+n;
+        const [px,py]=coordFor(p,prog,i);
+        frames.push({left:`${(px+.5)/15*100}%`,top:`${(py+.5)/15*100}%`,offset:n/steps,transform:n===steps?'scale(1)':'scale(1.08)'});
+      }
+      const duration=Math.min(steps*165,2400),elapsed=Math.max(0,Date.now()-(lm.at||Date.now()));
+      const anim=token.animate(frames,{duration,easing:'linear',fill:'both'});
+      anim.currentTime=Math.min(elapsed,duration);
+      lastAnimatedMoveKey=lm.moveId;
+    }
   });
 }
 function diceFace(value){
@@ -221,21 +221,9 @@ async function moveToken(playerId,index){
   if(!p||p.id!==localPlayerId||!roll||!isLegalMove(p,index,roll))return;
   busy=true;
   const start=p.tokens[index],leavingBase=start===-1,finalPos=leavingBase?0:start+roll;
-  const stepDelay=170;
-  if(leavingBase){
-    p.tokens[index]=0;room.lastMove={playerId:p.id,index,fromBase:true,at:Date.now()};
-    await publish();render();playSound('release');
-    await new Promise(resolve=>setTimeout(resolve,stepDelay));
-  }else{
-    for(let step=start+1;step<=finalPos;step++){
-      p.tokens[index]=step;
-      room.lastMove={playerId:p.id,index,fromBase:false,at:Date.now(),step};
-      await publish();render();
-      if(step===finalPos)break;
-      await new Promise(resolve=>setTimeout(resolve,stepDelay));
-      if(!room||currentPlayer()?.id!==localPlayerId){busy=false;return}
-    }
-  }
+  // Commit the complete move once. Every device animates the same path locally;
+  // intermediate database writes cannot overwrite a newer turn or shorten a move.
+  p.tokens[index]=finalPos;
   let captured=[];
   if(finalPos<=50){
     const square=(STARTS[p.color]+finalPos)%52;
@@ -249,11 +237,12 @@ async function moveToken(playerId,index){
     }
   }
   const landedSafe=finalPos<=50&&SAFE.includes((STARTS[p.color]+finalPos)%52);
-  room.lastMove={playerId:p.id,index,safe:landedSafe,fromBase:leavingBase,finished:finalPos===57,at:Date.now()};
+  room.lastMove={playerId:p.id,index,safe:landedSafe,fromBase:leavingBase,finished:finalPos===57,fromProgress:start,toProgress:finalPos,moveId:crypto.randomUUID(),at:Date.now()};
   if(captured.length)playSound('capture');
   else if(finalPos===57)playSound('win');
-  else if(!leavingBase&&landedSafe)playSound('safe');
-  else if(!leavingBase)playSound('move');
+  else if(leavingBase)playSound('release');
+  else if(landedSafe)playSound('safe');
+  else playSound('move');
   if(room.teamMode?teamHasWon(p.team):p.tokens.every(t=>t===57)){
     room.status='finished';room.winner=room.teamMode?teamName(p.team):p.name;
     room.message=room.teamMode?`${teamName(p.team)} wins together! 🎉`:`${p.name} wins the game! 🎉`;
@@ -262,7 +251,7 @@ async function moveToken(playerId,index){
     const earnedBonus=roll===6||captured.length>0||finalPos===57;
     room.message=`${p.name} moved token ${index+1}${finalPos===57?' home': ''}${captured.length?` and captured ${captured.join(', ')}!`:''}${earnedBonus?' — roll again!':''}`;
     if(!earnedBonus)nextTurn();
-    room.dice=null;
+    room.dice=null;room.diceRolling=null;
   }
   await publish();render();busy=false;
 }
