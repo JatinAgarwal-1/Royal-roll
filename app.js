@@ -130,8 +130,44 @@ function makeBoard(){const board=$('board');board.innerHTML='';
   Object.entries(LANES).forEach(([color,cells])=>cells.forEach(([x,y])=>{const el=document.createElement('div');el.className=`track-cell lane ${color}`;el.style.left=`${(x+.5)/15*100}%`;el.style.top=`${(y+.5)/15*100}%`;board.append(el)}));
   const center=document.createElement('div');center.className='center-home';center.innerHTML='<i class="home-triangle red"></i><i class="home-triangle green"></i><i class="home-triangle yellow"></i><i class="home-triangle blue"></i><i class="home-center-dot"></i>';board.append(center);
 }
-function renderTokens(){document.querySelectorAll('.token').forEach(e=>e.remove());if(!room)return;
-  room.players.forEach(p=>p.tokens.forEach((progress,i)=>{const [x,y]=coordFor(p,progress,i);const token=document.createElement('button');token.className=`token ${p.color}`;if(room.lastMove?.playerId===p.id&&room.lastMove?.index===i){token.classList.add('token-moved');if(room.lastMove.safe)token.classList.add('token-safe');if(room.lastMove.fromBase)token.classList.add('token-release')}token.style.left=`${(x+.5)/15*100}%`;token.style.top=`${(y+.5)/15*100}%`;token.innerHTML='<i class="token-shine"></i><i class="token-stud"></i>';token.setAttribute('aria-label',`${p.name}, token ${i+1}`);const movable=!!room.dice&&currentPlayer()?.id===localPlayerId&&p.id===localPlayerId&&isLegalMove(p,i,room.dice);if(movable)token.classList.add('movable');token.disabled=!movable||busy;token.addEventListener('click',()=>moveToken(p.id,i));$('board').append(token)}));
+function renderTokens(){
+  document.querySelectorAll('.token').forEach(e=>e.remove());if(!room)return;
+  const entries=[];
+  room.players.forEach(p=>p.tokens.forEach((progress,i)=>{
+    const [x,y]=coordFor(p,progress,i);
+    entries.push({p,progress,i,x,y,base:progress===-1});
+  }));
+  // Fan tokens out around a shared square so stacked pieces remain individually visible.
+  const stacks=new Map();
+  entries.filter(e=>!e.base).forEach(e=>{
+    const key=`${e.x},${e.y}`;
+    if(!stacks.has(key))stacks.set(key,[]);
+    stacks.get(key).push(e);
+  });
+  const spreadOffsets={
+    2:[[-.30,0],[.30,0]],
+    3:[[0,-.30],[-.30,.27],[.30,.27]],
+    4:[[-.28,-.28],[.28,-.28],[-.28,.28],[.28,.28]]
+  };
+  entries.forEach(e=>{
+    const {p,i,x,y,base}=e;
+    const token=document.createElement('button');token.className=`token ${p.color}`;
+    if(room.lastMove?.playerId===p.id&&room.lastMove?.index===i){token.classList.add('token-moved');if(room.lastMove.safe)token.classList.add('token-safe');if(room.lastMove.fromBase)token.classList.add('token-release')}
+    let dx=0,dy=0;
+    if(!base){
+      const stack=stacks.get(`${x},${y}`)||[];
+      const index=stack.indexOf(e),offsets=spreadOffsets[stack.length]||[];
+      if(offsets[index]){[dx,dy]=offsets[index]}
+    }
+    token.style.left=`${(x+.5+dx)/15*100}%`;
+    token.style.top=`${(y+.5+dy)/15*100}%`;
+    token.style.zIndex=String(5+(stacks.get(`${x},${y}`)||[]).indexOf(e));
+    token.innerHTML='<i class="token-shine"></i><i class="token-stud"></i>';
+    token.setAttribute('aria-label',`${p.name}, token ${i+1}`);
+    const movable=!!room.dice&&currentPlayer()?.id===localPlayerId&&p.id===localPlayerId&&isLegalMove(p,i,room.dice);
+    if(movable)token.classList.add('movable');
+    token.disabled=!movable||busy;token.addEventListener('click',()=>moveToken(p.id,i));$('board').append(token);
+  });
 }
 function diceFace(value){
   if(!value)return '🎲';
