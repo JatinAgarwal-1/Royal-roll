@@ -141,7 +141,7 @@ function renderTokens(){
   const spreadOffsets={2:[[-.30,0],[.30,0]],3:[[0,-.30],[-.30,.27],[.30,.27]],4:[[-.28,-.28],[.28,-.28],[-.28,.28],[.28,.28]]};
   entries.forEach(e=>{
     const {p,i,x,y,progress,base}=e,token=document.createElement('button');
-    token.className=`token ${p.color}`;
+    token.className=`token ${p.color}${base?' in-base':''}`;
     const lm=room.lastMove, isLast=lm?.playerId===p.id&&lm?.index===i;
     if(isLast){token.classList.add('token-moved');if(lm.safe)token.classList.add('token-safe');if(lm.fromBase)token.classList.add('token-release')}
     let dx=0,dy=0;
