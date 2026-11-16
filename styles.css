@@ -154,3 +154,12 @@ button.dice:not(:disabled):hover{filter:brightness(1.04);transform:translateY(-2
 /* Render the playable pieces as the only visible tokens inside each home. */
 .base-token{opacity:0;visibility:hidden}
 .token.in-base{width:8.2%;height:8.2%;}
+
+
+/* Per-device board orientation: keep the local player's home at bottom-left. */
+#board{transform-origin:center;transition:transform .35s ease;--board-counter-rotation:0deg}
+#board.orient-red{transform:rotate(-90deg);--board-counter-rotation:90deg}
+#board.orient-green{transform:rotate(180deg);--board-counter-rotation:-180deg}
+#board.orient-yellow{transform:rotate(90deg);--board-counter-rotation:-90deg}
+#board.orient-blue{transform:rotate(0deg);--board-counter-rotation:0deg}
+#board .base-name{transform:rotate(var(--board-counter-rotation))}
