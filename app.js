@@ -26,7 +26,7 @@ const BASES = [{color:'red',x:0,y:0},{color:'green',x:9,y:0},{color:'yellow',x:9
 const $ = id => document.getElementById(id);
 let room = null, channel = null, localPlayerId = localStorage.getItem('rr-player-id') || crypto.randomUUID();
 localStorage.setItem('rr-player-id',localPlayerId);
-let isHost = false, busy = false, toastTimer, audioContext = null, soundEnabled = true, lastAnimatedMoveKey = '';
+let isHost = false, busy = false, toastTimer, audioContext = null, soundEnabled = true, lastAnimatedMoveKey = '', syncTimer = null, refreshInFlight = false;
 
 function initialState(code, host, teamMode=true) { return {code, hostId:host.id, status:'waiting', teamMode, shuffleTeamsOnFull:false, players:[host], turn:0, dice:null, lastRoll:null, message:'Waiting for players to join.', winner:null, updatedAt:Date.now(), revision:0}; }
 function newPlayer(name,color,id=crypto.randomUUID(),team=null) { return {id,name,color,team,tokens:[-1,-1,-1,-1],connected:true}; }
@@ -61,6 +61,7 @@ function playSound(type){
   if(ctx.state==='running')schedule();else ctx.resume().then(()=>{if(ctx.state==='running')schedule()}).catch(()=>{});
 }
 document.addEventListener('pointerdown',unlockAudio,{once:true});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&room)refreshRoom()});
 function toggleSound(){soundEnabled=!soundEnabled;$('sound-toggle').textContent=soundEnabled?'Sound: On':'Sound: Off';if(soundEnabled)playSound('safe')}
 function canStartGame(){return !!room&&(room.teamMode?room.players.length===4:room.players.length>=2)}
 async function startGame(){if(!room||!isRoomHost()||room.status!=='waiting'||!canStartGame())return;playSound('win');room.status='playing';room.turn=0;room.dice=null;room.message=`${getMe()?.name||'Host'} started the game. Good luck!`;await publish();render()}
@@ -115,14 +116,14 @@ async function joinRoom(){
   if(saveError){setError('Could not join: '+saveError.message);return}
   isHost=false;await enterGame();
 }
-async function enterGame(){saveLocal();setViews(true);render();setConnection(true);
+async function enterGame(){saveLocal();setViews(true);render();setConnection(true);if(syncTimer)clearInterval(syncTimer);syncTimer=setInterval(()=>{if(document.visibilityState==='visible')refreshRoom()},650);
   if(channel)await supabase.removeChannel(channel);
-  channel=supabase.channel(`ludo-${room.code}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'ludo_rooms',filter:`room_code=eq.${room.code}`},payload=>{if(payload.new?.state){const incoming=payload.new.state;if((incoming.revision||0)>=(room.revision||0)){room=incoming;isHost=room.hostId?room.hostId===localPlayerId:isHost;render()}}}).subscribe(status=>{if(status==='SUBSCRIBED')setConnection(true);if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')setConnection(false)});
+  channel=supabase.channel(`ludo-${room.code}`).on('postgres_changes',{event:'UPDATE',schema:'public',table:'ludo_rooms',filter:`room_code=eq.${room.code}`},payload=>{if(payload.new?.state){const incoming=payload.new.state;if((incoming.revision||0)>(room.revision||0)){room=incoming;isHost=room.hostId?room.hostId===localPlayerId:isHost;render()}}}).subscribe(status=>{if(status==='SUBSCRIBED')setConnection(true);if(status==='CHANNEL_ERROR'||status==='TIMED_OUT')setConnection(false)});
   await refreshRoom();
 }
-async function refreshRoom(){if(!supabase||!room)return;const {data}=await supabase.from('ludo_rooms').select('state').eq('room_code',room.code).maybeSingle();if(data?.state&&(data.state.revision||0)>=(room.revision||0)){room=data.state;isHost=room.hostId?room.hostId===localPlayerId:isHost;render()}}
+async function refreshRoom(){if(!supabase||!room||refreshInFlight)return;refreshInFlight=true;try{const code=room.code;const {data,error}=await supabase.from('ludo_rooms').select('state').eq('room_code',code).maybeSingle();if(!error&&data?.state&&room?.code===code&&(data.state.revision||0)>(room.revision||0)){room=data.state;isHost=room.hostId?room.hostId===localPlayerId:isHost;render()}}finally{refreshInFlight=false}}
 async function publish(){if(!supabase||!room)return;room.updatedAt=Date.now();room.revision=(room.revision||0)+1;const snapshot=structuredClone(room);const {error}=await supabase.from('ludo_rooms').update({state:snapshot,updated_at:new Date().toISOString()}).eq('room_code',room.code);if(error)showToast('Sync issue: '+error.message);}
-async function leaveRoom(){if(channel){await supabase.removeChannel(channel);channel=null}room=null;isHost=false;setViews(false);setConnection(false)}
+async function leaveRoom(){if(syncTimer){clearInterval(syncTimer);syncTimer=null}if(channel){await supabase.removeChannel(channel);channel=null}room=null;isHost=false;setViews(false);setConnection(false)}
 function coordFor(player,progress,index){if(progress===57)return [7,7];if(progress===-1){const base={red:[2.0,2.0],green:[11.0,2.0],yellow:[11.0,11.0],blue:[2.0,11.0]}[player.color];const offsets=[[0,0],[1.5,0],[0,1.5],[1.5,1.5]][index];return [base[0]+offsets[0],base[1]+offsets[1]]}if(progress>=51){const [x,y]=LANES[player.color][Math.min(5,progress-51)];return [x,y]}const [x,y]=TRACK[(STARTS[player.color]+progress)%52];return [x,y]}
 function makeBoard(){const board=$('board');board.innerHTML='';
   BASES.forEach(({color,x,y})=>{const base=document.createElement('div');base.className=`base ${color}`;base.style.gridColumn=`${x+1}/span 6`;base.style.gridRow=`${y+1}/span 6`;const player=room?.players?.find(p=>p.color===color);const baseLabel=player?escapeHtml(player.name):(room?.status==='playing'?'':'Waiting');base.innerHTML=`${baseLabel?`<span class="base-name" title="${player?escapeHtml(player.name):'Waiting for player'}">${baseLabel}</span>`:''}<div class="base-inner">${[0,1,2,3].map(()=>`<i class="base-token" style="--token:var(--${color})"></i>`).join('')}</div>`;board.append(base)});
@@ -200,7 +201,7 @@ async function rollDice(){
   room.diceRolling={playerId:roller.id,startedAt:Date.now()};
   room.message=`${roller.name} is rolling the dice…`;
   await publish();render();playSound('roll');
-  await new Promise(resolve=>setTimeout(resolve,850));
+  await new Promise(resolve=>setTimeout(resolve,1600));
   if(!room||currentPlayer()?.id!==localPlayerId){busy=false;return}
   const roll=1+Math.floor(Math.random()*6);room.diceRolling=null;room.dice=roll;room.lastRoll=roll;
   const p=currentPlayer();const legalMoves=p.tokens.map((pos,i)=>isLegalMove(p,i,roll)?i:-1).filter(i=>i>=0);
