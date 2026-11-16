@@ -118,3 +118,13 @@ button.dice:not(:disabled):hover{filter:brightness(1.04);transform:translateY(-2
 @keyframes safeShine{0%,100%{box-shadow:inset 0 0 0 2px #fff,0 1px 4px rgba(105,76,20,.18)}50%{box-shadow:inset 0 0 0 2px #fff,0 0 9px rgba(222,177,75,.5)}}
 @media(max-width:680px){.board-wrap{padding:7px;border-radius:17px}.track-cell.safe:after{font-size:clamp(8px,2vw,12px)}.base-name{font-size:clamp(7px,2.1vw,10px)}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
+
+/* Number-free polished Ludo tokens and true pip-based dice faces */
+.token{border:2px solid rgba(255,255,255,.96);overflow:hidden;isolation:isolate}
+.token-shine{position:absolute;left:17%;top:12%;width:38%;height:24%;border-radius:50%;background:rgba(255,255,255,.55);filter:blur(.5px);transform:rotate(-35deg);pointer-events:none}
+.token-stud{position:absolute;left:31%;top:29%;width:38%;height:38%;border-radius:50%;background:radial-gradient(circle at 35% 30%,rgba(255,255,255,.95),rgba(255,255,255,.42) 48%,rgba(0,0,0,.12));border:1px solid rgba(255,255,255,.5);box-shadow:0 1px 2px rgba(0,0,0,.22);pointer-events:none}
+.dice{position:relative;overflow:hidden;padding:7px}
+.dice-pips{width:100%;height:100%;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:2px;align-items:center;justify-items:center}
+.pip{width:clamp(5px,1.05vw,9px);height:clamp(5px,1.05vw,9px);border-radius:50%;background:radial-gradient(circle at 32% 28%,#52617a,#17243a 72%);box-shadow:inset 0 1px 1px rgba(0,0,0,.25),0 1px 0 rgba(255,255,255,.8)}
+.p0{grid-area:1/1}.p1{grid-area:1/2}.p2{grid-area:1/3}.p3{grid-area:2/1}.p4{grid-area:2/2}.p5{grid-area:2/3}.p6{grid-area:3/1}.p7{grid-area:3/2}.p8{grid-area:3/3}
+@media(max-width:680px){.pip{width:7px;height:7px}}
