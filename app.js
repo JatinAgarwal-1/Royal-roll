@@ -174,7 +174,7 @@ function diceFace(value){
   const patterns={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
   return '<span class="dice-pips">'+patterns[value].map(n=>'<i class="pip p'+n+'"></i>').join('')+'</span>';
 }
-function render(){if(!room)return;makeBoard();renderTokens();$('room-code-display').textContent=room.code;$('room-subtitle').textContent=room.status==='waiting'?'Waiting for your crew...':room.status==='finished'?`${room.winner} won the game!`:(room.teamMode?'2 vs 2 team battle':'Free-for-all');
+function render(){if(!room)return;const board=$('board');board.classList.remove('orient-red','orient-green','orient-yellow','orient-blue');const myPlayer=room.players.find(p=>p.id===localPlayerId);if(myPlayer)board.classList.add('orient-'+myPlayer.color);makeBoard();renderTokens();$('room-code-display').textContent=room.code;$('room-subtitle').textContent=room.status==='waiting'?'Waiting for your crew...':room.status==='finished'?`${room.winner} won the game!`:(room.teamMode?'2 vs 2 team battle':'Free-for-all');
   $('player-count').textContent=`${room.players.length} / 4`;
   $('players-list').innerHTML=COLORS.map(c=>{const p=room.players.find(p=>p.color===c);return `<div class="player-row" style="--player:var(--${c})"><i class="player-dot"></i><div class="player-info"><b>${p?`${c[0].toUpperCase()+c.slice(1)} player`:'Waiting for player'}</b><small>${p?`${p.tokens.filter(t=>t===57).length}/4 home${room.teamMode?' · '+teamName(p.team):''}`:'Open seat'}</small></div><span class="player-state">${p?(p.id===localPlayerId?'YOU':(room.players[room.turn]?.id===p.id?'TURN':'')):''}</span></div>`}).join('');
   const teamControls=$('team-controls');teamControls.classList.toggle('hidden',!room.teamMode);
