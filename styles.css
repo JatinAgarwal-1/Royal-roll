@@ -63,3 +63,58 @@ button.dice:not(:disabled):active{transform:scale(.94)}
 .game-sidebar{display:flex;flex-direction:column;gap:15px}
 .team-controls-standalone{margin:0;padding:14px;background:linear-gradient(145deg,#1c2a40,#172338);border:1px solid var(--line);border-radius:15px}
 @media(max-width:680px){.game-sidebar{display:flex;flex-direction:column;gap:12px}}
+
+/* ===== Roll Royale visual refresh: richer colours, clearer track and polished motion ===== */
+:root{
+  --bg:#0b1422;--panel:#17243a;--panel2:#20314b;--text:#f5f7fc;--muted:#9aa9bf;--line:rgba(211,225,255,.13);
+  --red:#e85c68;--green:#22b88c;--yellow:#e8b843;--blue:#4f89df;
+}
+body{background:radial-gradient(ellipse at 50% -18%,#304361 0,transparent 46%),linear-gradient(160deg,#0b1422,#111e31 58%,#0b1422)}
+.topbar{border-color:rgba(180,202,238,.13)}
+.lobby-card,.turn-panel,.rules-note,.team-controls-standalone{background:linear-gradient(145deg,rgba(31,47,71,.98),rgba(19,31,49,.98));border-color:rgba(194,213,245,.16);box-shadow:0 16px 44px rgba(0,0,0,.2)}
+.board-wrap{padding:11px;background:linear-gradient(145deg,#f8f7f1,#d9dfe7);border:1px solid rgba(255,255,255,.72);box-shadow:0 22px 65px rgba(0,0,0,.38),0 0 0 1px rgba(255,255,255,.12)}
+.board{background:#f8f9fb;border-radius:11px}
+.cell,.track-cell{border-color:#cbd2dc;background:#fff}
+.track-cell{box-shadow:inset 0 0 0 1px rgba(255,255,255,.8)}
+.track-cell.lane.red{background:#f6d7da}
+.track-cell.lane.green{background:#d0eee4}
+.track-cell.lane.yellow{background:#f6e9c5}
+.track-cell.lane.blue{background:#d6e4f8}
+/* Safe squares: gold medallion, strong outline and star symbol. */
+.track-cell.safe{z-index:1;background:#fff7df;border:2px solid #c89b35;border-radius:7px;box-shadow:inset 0 0 0 2px #fff,0 1px 4px rgba(105,76,20,.22)}
+.track-cell.safe:after{content:'★';display:grid;place-items:center;width:72%;height:72%;border-radius:50%;background:radial-gradient(circle at 35% 28%,#fff1bd,#e6b94f 68%,#b98626);color:#725014;font-size:clamp(8px,1.55vw,15px);line-height:1;text-shadow:0 1px 0 rgba(255,255,255,.55);box-shadow:0 1px 2px rgba(78,53,10,.28)}
+.base.red{background:linear-gradient(145deg,#ed737c,#c94352)}
+.base.green{background:linear-gradient(145deg,#39c99e,#15966f)}
+.base.yellow{background:linear-gradient(145deg,#f2cb65,#d69d2e)}
+.base.blue{background:linear-gradient(145deg,#75a8ef,#3973c6)}
+.base{box-shadow:inset 0 2px 0 rgba(255,255,255,.25),inset 0 -5px 12px rgba(0,0,0,.1)}
+.base-inner{box-shadow:0 4px 12px rgba(25,35,50,.12);border:1px solid rgba(31,45,65,.08)}
+.base-token{background:linear-gradient(145deg,rgba(255,255,255,.26),transparent 48%),var(--token);box-shadow:inset 0 -4px 0 rgba(0,0,0,.18),0 3px 5px rgba(0,0,0,.2)}
+.base-name{font-size:clamp(8px,1.25vw,13px);letter-spacing:.25px;text-shadow:0 1px 3px rgba(0,0,0,.45)}
+.token{border-width:2px;box-shadow:inset 0 2px 2px rgba(255,255,255,.42),inset 0 -5px 0 rgba(0,0,0,.2),0 3px 7px rgba(12,22,38,.35);transition:left .22s ease,top .22s ease,filter .18s,box-shadow .18s}
+.token.red{background:linear-gradient(145deg,#f27d86,#d74755)}
+.token.green{background:linear-gradient(145deg,#51d6b0,#159c76)}
+.token.yellow{background:linear-gradient(145deg,#f5d16e,#dba42f)}
+.token.blue{background:linear-gradient(145deg,#85b5f5,#3e79ce)}
+.token.movable{outline:3px solid #fff;outline-offset:2px;box-shadow:0 0 0 5px rgba(28,42,63,.35),0 0 18px rgba(255,255,255,.8),inset 0 -4px 0 rgba(0,0,0,.15);animation:legalGlow 1.15s ease-in-out infinite}
+@keyframes legalGlow{0%,100%{filter:brightness(1);box-shadow:0 0 0 4px rgba(255,255,255,.18),0 0 9px rgba(255,255,255,.4),inset 0 -4px 0 rgba(0,0,0,.15)}50%{filter:brightness(1.18);box-shadow:0 0 0 7px rgba(255,255,255,.28),0 0 21px rgba(255,255,255,.8),inset 0 -4px 0 rgba(0,0,0,.15)}}
+.token-moved{animation:tokenLand .52s cubic-bezier(.2,.8,.25,1)}
+@keyframes tokenLand{0%{scale:.65;filter:brightness(1.5)}55%{scale:1.22;filter:brightness(1.25)}78%{scale:.94}100%{scale:1;filter:none}}
+.center-home{filter:drop-shadow(0 1px 2px rgba(20,35,50,.22))}
+.home-center-dot{border:2px solid #e3e7ed;box-shadow:0 2px 5px rgba(0,0,0,.18)}
+.turn-panel{border-radius:18px}
+.dice{border:1px solid #fff;background:linear-gradient(145deg,#fff,#e7eaf0);box-shadow:0 5px 0 #c2c9d3,0 9px 18px rgba(0,0,0,.25);font-size:36px}
+button.dice:not(:disabled){cursor:pointer;box-shadow:0 5px 0 #c2c9d3,0 0 0 4px rgba(255,255,255,.09),0 9px 18px rgba(0,0,0,.25)}
+button.dice:not(:disabled):hover{filter:brightness(1.04);transform:translateY(-2px)}
+.primary-btn{background:linear-gradient(105deg,#a9b8ff,#c4a5f3);box-shadow:0 8px 22px rgba(137,148,238,.22)}
+.secondary-btn{background:linear-gradient(145deg,#304765,#243750);border-color:rgba(210,226,255,.15)}
+.game-heading h1{letter-spacing:-.8px}
+.room-code-box{background:linear-gradient(145deg,#20334e,#17263d);border-color:rgba(210,226,255,.15)}
+.board-wrap{animation:boardEnter .55s cubic-bezier(.2,.8,.2,1) both}
+@keyframes boardEnter{from{opacity:0;transform:translateY(9px) scale(.985)}to{opacity:1;transform:translateY(0) scale(1)}}
+.base-name{animation:nameFade .45s ease both}
+@keyframes nameFade{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+.track-cell.safe{animation:safeShine 3.2s ease-in-out infinite}
+@keyframes safeShine{0%,100%{box-shadow:inset 0 0 0 2px #fff,0 1px 4px rgba(105,76,20,.18)}50%{box-shadow:inset 0 0 0 2px #fff,0 0 9px rgba(222,177,75,.5)}}
+@media(max-width:680px){.board-wrap{padding:7px;border-radius:17px}.track-cell.safe:after{font-size:clamp(8px,2vw,12px)}.base-name{font-size:clamp(7px,2.1vw,10px)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition-duration:.01ms!important}}
