@@ -131,7 +131,12 @@ function makeBoard(){const board=$('board');board.innerHTML='';
   const center=document.createElement('div');center.className='center-home';center.innerHTML='<i class="home-triangle red"></i><i class="home-triangle green"></i><i class="home-triangle yellow"></i><i class="home-triangle blue"></i><i class="home-center-dot"></i>';board.append(center);
 }
 function renderTokens(){document.querySelectorAll('.token').forEach(e=>e.remove());if(!room)return;
-  room.players.forEach(p=>p.tokens.forEach((progress,i)=>{const [x,y]=coordFor(p,progress,i);const token=document.createElement('button');token.className=`token ${p.color}`;if(room.lastMove?.playerId===p.id&&room.lastMove?.index===i){token.classList.add('token-moved');if(room.lastMove.safe)token.classList.add('token-safe');if(room.lastMove.fromBase)token.classList.add('token-release')}token.style.left=`${(x+.5)/15*100}%`;token.style.top=`${(y+.5)/15*100}%`;token.textContent=String(i+1);token.setAttribute('aria-label',`${p.name}, token ${i+1}`);const movable=!!room.dice&&currentPlayer()?.id===localPlayerId&&p.id===localPlayerId&&isLegalMove(p,i,room.dice);if(movable)token.classList.add('movable');token.disabled=!movable||busy;token.addEventListener('click',()=>moveToken(p.id,i));$('board').append(token)}));
+  room.players.forEach(p=>p.tokens.forEach((progress,i)=>{const [x,y]=coordFor(p,progress,i);const token=document.createElement('button');token.className=`token ${p.color}`;if(room.lastMove?.playerId===p.id&&room.lastMove?.index===i){token.classList.add('token-moved');if(room.lastMove.safe)token.classList.add('token-safe');if(room.lastMove.fromBase)token.classList.add('token-release')}token.style.left=`${(x+.5)/15*100}%`;token.style.top=`${(y+.5)/15*100}%`;token.innerHTML='<i class="token-shine"></i><i class="token-stud"></i>';token.setAttribute('aria-label',`${p.name}, token ${i+1}`);const movable=!!room.dice&&currentPlayer()?.id===localPlayerId&&p.id===localPlayerId&&isLegalMove(p,i,room.dice);if(movable)token.classList.add('movable');token.disabled=!movable||busy;token.addEventListener('click',()=>moveToken(p.id,i));$('board').append(token)}));
+}
+function diceFace(value){
+  if(!value)return '🎲';
+  const patterns={1:[4],2:[0,8],3:[0,4,8],4:[0,2,6,8],5:[0,2,4,6,8],6:[0,2,3,5,6,8]};
+  return '<span class="dice-pips">'+patterns[value].map(n=>'<i class="pip p'+n+'"></i>').join('')+'</span>';
 }
 function render(){if(!room)return;makeBoard();renderTokens();$('room-code-display').textContent=room.code;$('room-subtitle').textContent=room.status==='waiting'?'Waiting for your crew...':room.status==='finished'?`${room.winner} won the game!`:(room.teamMode?'2 vs 2 team battle':'Free-for-all');
   $('player-count').textContent=`${room.players.length} / 4`;
@@ -143,7 +148,7 @@ function render(){if(!room)return;makeBoard();renderTokens();$('room-code-displa
     $('shuffle-teams').disabled=room.players.length!==4||room.status==='finished'||!isHost;
     $('shuffle-teams').title=isHost?'Randomly reassign two players to each team':'Only the room host can shuffle teams';
   }
-  const cp=currentPlayer();$('turn-name').textContent=room.winner?`${room.winner} wins!`:cp?.name||'Waiting...';$('turn-hint').textContent=room.winner?'Game complete':room.status==='waiting'?(isRoomHost()?'Start when your players are ready':'Waiting for the host to start'):(room.teamMode&&room.players.length<4)?'Waiting for all four teammates':cp?.id===localPlayerId?'Your turn: make a move':`${cp?.name||'Player'} is playing`;$('turn-avatar').className=`turn-avatar ${cp?.color||'red'}`;$('dice').textContent=room.dice??'🎲';$('game-message').textContent=room.message||'';
+  const cp=currentPlayer();$('turn-name').textContent=room.winner?`${room.winner} wins!`:cp?.name||'Waiting...';$('turn-hint').textContent=room.winner?'Game complete':room.status==='waiting'?(isRoomHost()?'Start when your players are ready':'Waiting for the host to start'):(room.teamMode&&room.players.length<4)?'Waiting for all four teammates':cp?.id===localPlayerId?'Your turn: make a move':`${cp?.name||'Player'} is playing`;$('turn-avatar').className=`turn-avatar ${cp?.color||'red'}`;$('dice').innerHTML=diceFace(room.dice);$('game-message').textContent=room.message||'';
   const myTurn=cp?.id===localPlayerId&&!room.winner&&room.status==='playing';
   $('dice').disabled=!myTurn||!!room.dice||(room.teamMode?room.players.length<4:room.players.length<2)||busy;
   $('dice').setAttribute('aria-label',room.dice?'Dice shows '+room.dice:myTurn?'Tap to roll the dice':'Waiting for your turn');
