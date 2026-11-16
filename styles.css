@@ -163,3 +163,10 @@ button.dice:not(:disabled):hover{filter:brightness(1.04);transform:translateY(-2
 #board.orient-yellow{transform:rotate(90deg);--board-counter-rotation:-90deg}
 #board.orient-blue{transform:rotate(0deg);--board-counter-rotation:0deg}
 #board .base-name{transform:rotate(var(--board-counter-rotation))}
+
+
+/* Mobile touch reliability: preserve real pointer/touch hit targets on the rotated board. */
+#board{position:relative;isolation:isolate;pointer-events:auto;touch-action:manipulation;-webkit-user-select:none;user-select:none}
+#board .token{pointer-events:auto;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+#board .base,#board .track-cell,#board .center-home{pointer-events:none}
+@media(max-width:680px){#board{transition:none}.board-wrap{touch-action:pan-y}#board .token{min-width:22px;min-height:22px}}
