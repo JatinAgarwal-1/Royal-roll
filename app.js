@@ -185,7 +185,7 @@ function render(){if(!room)return;const board=$('board');board.classList.remove(
     $('shuffle-teams').disabled=room.players.length!==4||room.status==='finished'||!isHost;
     $('shuffle-teams').title=isHost?'Randomly reassign two players to each team':'Only the room host can shuffle teams';
   }
-  const cp=currentPlayer();$('turn-name').textContent=room.winner?`${room.winner} wins!`:cp?.name||'Waiting...';$('turn-hint').textContent=room.winner?'Game complete':room.status==='waiting'?(isRoomHost()?'Start when your players are ready':'Waiting for the host to start'):(room.teamMode&&room.players.length<4)?'Waiting for all four teammates':cp?.id===localPlayerId?'Your turn: make a move':`${cp?.name||'Player'} is playing`;$('turn-avatar').className=`turn-avatar ${cp?.color||'red'}`;$('dice').innerHTML=diceFace(room.dice);$('dice').classList.toggle('dice-roll',!!room.diceRolling);$('game-message').textContent=room.message||'';
+  const cp=currentPlayer();$('turn-name').textContent=room.winner?`${room.winner} wins!`:cp?.name||'Waiting...';$('turn-hint').textContent=room.winner?'Game complete':room.status==='waiting'?(isRoomHost()?'Start when your players are ready':'Waiting for the host to start'):(room.teamMode&&room.players.length<4)?'Waiting for all four teammates':cp?.id===localPlayerId?'Your turn: make a move':`${cp?.name||'Player'} is playing`;$('turn-avatar').className=`turn-avatar ${cp?.color||'red'}`;$('dice').innerHTML=diceFace(room.dice);$('game-message').textContent=room.message||'';
   const myTurn=cp?.id===localPlayerId&&!room.winner&&room.status==='playing';
   $('dice').disabled=!myTurn||!!room.dice||(room.teamMode?room.players.length<4:room.players.length<2)||busy;
   $('dice').setAttribute('aria-label',room.dice?'Dice shows '+room.dice:myTurn?'Tap to roll the dice':'Waiting for your turn');
@@ -195,15 +195,14 @@ function render(){if(!room)return;const board=$('board');board.classList.remove(
 function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function isLegalMove(player,index,roll){const pos=player.tokens[index];if(pos===57)return false;if(pos===-1)return roll===6;if(pos+roll>57)return false;return true}
 async function rollDice(){
-  if(busy||!room||room.status!=='playing'||currentPlayer()?.id!==localPlayerId||room.dice||room.diceRolling||(room.teamMode?room.players.length<4:room.players.length<2))return;
+  if(busy||!room||room.status!=='playing'||currentPlayer()?.id!==localPlayerId||room.dice||(room.teamMode?room.players.length<4:room.players.length<2))return;
   busy=true;
   const roller=currentPlayer();
-  room.diceRolling={playerId:roller.id,startedAt:Date.now()};
-  room.message=`${roller.name} is rolling the dice…`;
-  await publish();render();playSound('roll');
-  await new Promise(resolve=>setTimeout(resolve,1600));
+  $('dice').classList.add('dice-roll');playSound('roll');
+  await new Promise(resolve=>setTimeout(resolve,850));
+  $('dice').classList.remove('dice-roll');
   if(!room||currentPlayer()?.id!==localPlayerId){busy=false;return}
-  const roll=1+Math.floor(Math.random()*6);room.diceRolling=null;room.dice=roll;room.lastRoll=roll;
+  const roll=1+Math.floor(Math.random()*6);room.dice=roll;room.lastRoll=roll;
   const p=currentPlayer();const legalMoves=p.tokens.map((pos,i)=>isLegalMove(p,i,roll)?i:-1).filter(i=>i>=0);
   room.message=legalMoves.length===1?`${p.name} rolled a ${roll}. Only one move available — moving token ${legalMoves[0]+1} automatically.`:legalMoves.length>1?`${p.name} rolled a ${roll}. Choose a token.`:roll===6?'No legal move — roll again!':`${p.name} rolled a ${roll}. No legal move.`;
   await publish();render();busy=false;
